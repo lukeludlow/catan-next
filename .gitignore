@@ -43,3 +43,5 @@ next-env.d.ts
 # Vitest browser-mode artifacts
 __screenshots__
 .vitest-attachments
+
+.idea
