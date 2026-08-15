@@ -776,11 +776,22 @@ Settings → Applications → Installed GitHub Apps → Vercel**. Once granted, 
 identical `vercel git connect` command succeeded.
 
 With the Git connection in place, deploys are driven entirely by pushes —
-opening this phase's own PR produced the preview deploy, and merging it to
-`main` produced the production deploy at `https://catan-next.vercel.app`
-[production URL TODO: confirm against `vercel ls` after the first deploy], no
-manual `vercel deploy`/`vercel --prod` involved at any point. The GitHub Pages
-app at `lukeludlow.github.io/catan` is left running; retiring it is a separate
+opening this phase's own PR produced a deployment, and merging it to `main`
+produced the production deploy at `https://catan-next.vercel.app`, no manual
+`vercel deploy`/`vercel --prod` involved at any point. Both were verified by
+fetching `/base-game` and `/seafarers?seed=…` off the live deployment and
+counting hexes in the returned markup (19 and 42) rather than trusting a green
+build alone.
+
+**One quirk worth recording:** the PR's own deployment came back tagged
+`target: production` and briefly held the `catan-next.vercel.app` alias, even
+though it built from the `phase-7-vercel-deploy` branch, not `main`. Vercel
+promotes a brand-new project's very first deployment to production regardless of
+which branch triggered it, since there is no prior production deployment to
+compare against. Merging the PR triggered a second deployment from `main`, which
+took over the production alias as expected — this only matters for a project's
+first-ever deploy, and does not recur afterward. The GitHub Pages app at
+`lukeludlow.github.io/catan` is left running; retiring it is a separate
 decision, not part of this phase's done condition.
 
 ### 9.8 Player-count support (Phases 8–10)
