@@ -805,6 +805,35 @@ pushed straight to the remote, so the Angular dependency tree was never resolved
 on any machine. Archiving leaves the Pages site serving, so the redirect
 survives it.
 
+**Follow-up: analytics, and the old app's icon.** Two small things the deploy
+made worth doing. `@vercel/analytics` is rendered from the root layout as
+`<Analytics />`, imported from the `@vercel/analytics/next` subpath rather than
+`/react` — the Next entry reads route changes from the App Router itself, so
+client navigations are counted without per-page wiring. It renders nothing,
+which is exactly why `src/app/layout.test.ts` exists: no screenshot or visual
+test could ever catch its removal, so a unit test calls the layout as the plain
+function it is and walks the returned elements for an `Analytics` identity
+match. The code is inert until **Web Analytics is enabled in the Vercel
+dashboard** (project → Analytics → Enable); that toggle is the deploy's, not the
+repo's. `@vercel/speed-insights` was considered and skipped — a separate package
+for a separate question.
+
+The icon is the board photo from the retired Angular app, copied out of
+`~/ws/catan/src/assets/favicon/` as binaries only — that tree was never
+installed, built, or run, matching the care taken above. It lands as
+`src/app/favicon.ico`, `icon.png` (the 512×512) and `apple-icon.png` (180×180),
+which Next turns into `<link>` tags from the **filenames alone**; a
+`metadata.icons` block would be a second source of truth for the same tags, so
+there deliberately is none, and `layout.test.ts` asserts it stays absent. The
+rest of that old favicon-generator bundle was dropped on purpose:
+`browserconfig.xml` + `mstile-150x150.png` target Windows 8 tiles, the 173 KB
+`safari-pinned-tab.svg` is a `mask-icon` Safari no longer reads, and the
+`manifest.json` has an empty `"name"` — a real web manifest is its own change,
+not a copied stub. Because nothing imports these three files, nothing typechecks
+them either, so `src/app/icons.test.ts` checks their magic numbers and lengths:
+a half-finished binary copy would otherwise build and deploy cleanly and only
+show up as a broken tab icon.
+
 ### 9.8 Player-count support (Phases 8–10)
 
 **First, a correction to expectations.** The current `~/ws/catan` does **not**
