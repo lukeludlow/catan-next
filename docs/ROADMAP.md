@@ -180,8 +180,8 @@ topology is right.
 
 ## 4. Corrections and deliberate changes
 
-§4.1–4.6 are defects that exist in `~/ws/catan` today; do not carry them over.
-§4.7 is an intentional change in behavior.
+§4.1–4.6 and §4.8 are defects that exist in `~/ws/catan` today; do not carry
+them over. §4.7 is an intentional change in behavior.
 
 **4.1 Dice chit shortage.** Seafarers has 28 chits but `Sea: {min: 12}` allows
 up to 30 resource hexes. When the bag empties, `getRandomElementFromArray([])`
@@ -241,6 +241,26 @@ with a `maxAttempts` (start at 1000, and revisit once §4.7's effect on the
 acceptance rate is measured) and throw a typed error rather than spinning
 forever, which is what the current code does when the islands slider asks for an
 unlikely value.
+
+**4.8 `listNeighbors` is wrong for two of the 42 Seafarers hexes.** Found in
+Phase 1 by running the original's own conversion, inverse, and bounds check
+against a plain axial lookup for every hex: 40 agree, 2 do not. Both are on the
+west edge, and both have the same cause — `figureOutRow`/`figureOutCol` map an
+_off-board_ coordinate onto a real hex instead of rejecting it, because the
+inverse is a lookup table with no notion of which coordinates exist.
+
+- Hex `(1,0)`: off-board `(-3,1)` inverts to `(1,0)`, so **the hex is returned
+  as its own neighbor**. Any adjacency rule that compares a hex to its neighbors
+  — the 6/8 check — is therefore comparing that hex against itself.
+- Hex `(2,0)`: off-board `(-3,1)` inverts to `(1,0)`, which is _also_ its
+  genuine west neighbor, so **that neighbor is listed twice**. This is the same
+  duplicate-bias mechanism as §4.4, in `listNeighbors` rather than in the port
+  edge table.
+
+**Fix:** both vanish under §3 — an off-board direction simply misses the map.
+`hex.test.ts` keeps a regression for each (no hex is its own neighbor; no
+neighbor appears twice), and `shapes.test.ts` asserts the corrected neighbor
+sets for these two hexes by name.
 
 ---
 
@@ -398,7 +418,7 @@ Update the status column in place as phases land.
 | #   | Phase                                          | Status |
 | --- | ---------------------------------------------- | ------ |
 | 0   | Repo bootstrap and standards                   | ✅     |
-| 1   | Hex topology                                   | ⬜     |
+| 1   | Hex topology                                   | ✅     |
 | 2   | Randomness and settings                        | ⬜     |
 | 3   | Generation pipeline                            | ⬜     |
 | 4   | SVG rendering                                  | ⬜     |
