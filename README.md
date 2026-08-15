@@ -98,3 +98,6 @@ Every push to `main` deploys to production; every pull request gets its own
 preview deployment. The original Angular app has been retired: its repo is
 archived at [`lukeludlow/catan`](https://github.com/lukeludlow/catan), and
 `lukeludlow.github.io/catan` now redirects here.
+
+Page views are collected by Vercel Web Analytics and read in the project's
+**Analytics** tab. Nothing is recorded locally or from preview deploys.
