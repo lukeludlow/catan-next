@@ -180,16 +180,40 @@ topology is right.
 
 ## 4. Corrections and deliberate changes
 
-§4.1–4.6 and §4.8 are defects that exist in `~/ws/catan` today; do not carry
-them over. §4.7 is an intentional change in behavior.
+§4.2–4.6 and §4.8 are defects that exist in `~/ws/catan` today; do not carry
+them over. §4.7 is an intentional change in behavior. §4.1 was believed to be a
+defect and is not — see below.
 
-**4.1 Dice chit shortage.** Seafarers has 28 chits but `Sea: {min: 12}` allows
-up to 30 resource hexes. When the bag empties, `getRandomElementFromArray([])`
-returns `undefined`, the hex renders `seafarers/undefined.png`, and the board is
-visibly broken. **Fix:** set `Sea: {min: 14, max: 19}`, capping resource hexes
-at 28. Add a unit test asserting, for every variant's settings, that the chit
-pool size is ≥ the maximum possible resource-hex count — so the invariant is
-enforced rather than remembered.
+**4.1 Dice chit shortage — investigated in Phase 2, and not real.** This section
+originally claimed Seafarers could exhaust its 28-chit bag, because
+`Sea: {min: 12}` appears to allow `42 − 12 = 30` resource hexes; the bag would
+empty, `getRandomElementFromArray([])` would return `undefined`, and the hex
+would render `seafarers/undefined.png`. The prescribed fix was
+`Sea: {min: 14, max: 19}`.
+
+That arithmetic ignores the per-terrain **maximums**. Resource hexes are capped
+by the resource half of the bag —
+`brick 5 + gold 2 + rock 5 + sheep 5 + tree 5 + wheat 5 = 27` — which is below
+the 28-chit pool no matter what sea's minimum is. Replaying the original's
+`TerrainGenerator` over 200,000 boards per configuration confirms it:
+
+| Setting        | Resource hexes | Sea      | Chit pool | Underruns    |
+| -------------- | -------------- | -------- | --------- | ------------ |
+| `Sea.min = 12` | [23, 27]       | [15, 19] | 28        | 0 of 200,000 |
+| `Sea.min = 14` | [23, 27]       | [15, 19] | 28        | 0 of 200,000 |
+
+Sea's declared minimum of 12 is not even reachable: only 20 of the 24 remainder
+tiles are drawn and 17 of them are resources, so at least 3 sea tiles always
+come out of the remainder. Raising the minimum to 14 moves neither bound — it
+only shifts the sea distribution slightly, which is a change in board character
+rather than a fix.
+
+**Decision (with the user):** keep `Sea: {min: 12, max: 19}` as the original
+ships it. **Keep the test regardless** — `variants.test.ts` asserts, for every
+variant in the registry, that the chit pool is ≥ the maximum possible
+resource-hex count. That is what turns an invariant the original merely relied
+on into one it is impossible to break silently, and it is what covers the
+variants added in Phases 9–10 (§9.8).
 
 **4.2 `removeFirstOccurrence` silently removes the last element** when nothing
 matches (`findIndex` → `-1` → `splice(-1, 1)`), `_services/array.service.ts`.
@@ -276,8 +300,13 @@ export type Rng = () => number;
 export function mulberry32(seed: number): Rng; // seeded PRNG
 export function seedFromString(seed: string): number;
 export function shuffle<T>(items: readonly T[], rng: Rng): T[]; // correct Fisher-Yates
-export function pick<T>(items: readonly T[], rng: Rng): T;
+export function pick<T>(items: readonly T[], rng: Rng): T; // throws on an empty array
 ```
+
+`pick` throwing is deliberate: the original returned `undefined` from an empty
+bag and let it travel to an `<img src>`. One correct `shuffle` also replaces
+`removeFirstOccurrence` outright (§4.2) — a bag is shuffled once and consumed,
+so nothing is ever removed by predicate.
 
 `generateBoard(settings, options, rng)` in `src/domain/generate.ts` runs:
 
@@ -296,10 +325,17 @@ export function pick<T>(items: readonly T[], rng: Rng): T;
    `maxAttempts`.
 
 Settings live in `src/domain/settings.ts` as two plain objects. Seafarers keeps
-the original counts (with the §4.1 sea correction); Base Game gets the counts
-from `readme_dev.md` — brick 3, desert 1, rock 3, sheep 4, tree 4, wheat 4;
-chits 2×1, 3–6×2, 8–11×2, 12×1; ports 1 each of rock/wheat/tree/sheep/brick plus
-4 "any".
+the original counts unchanged (§4.1); Base Game gets the counts from
+`readme_dev.md` — brick 3, desert 1, rock 3, sheep 4, tree 4, wheat 4; chits
+2×1, 3–6×2, 8–11×2, 12×1; ports 1 each of rock/wheat/tree/sheep/brick plus 4
+"any".
+
+The original's `requiredHexesCount` field is **not** ported — a hex count stored
+in the settings can disagree with the shape it describes. The count comes from
+the shape, and `src/domain/variants.ts` is the one place the two are paired.
+Port counts are plain numbers rather than `{min, max}` ranges: every port count
+in every variant is exact, and the original only ever read the `max` of its own
+port ranges.
 
 Note the original disables deserts on Seafarers (`Desert: {min: 0, max: 0}`)
 even though `readme_dev.md` documents 3, and there is no robber anywhere. Keep
@@ -365,7 +401,9 @@ intent instead.
   over many trials and can leave an element in place (§4.3).
 - `shapes.test.ts` — Base Game has 19 hexes, Seafarers 42; no duplicate
   coordinates; every hex's neighbors are symmetric.
-- `settings.test.ts` — the chit-pool invariant from §4.1, for both variants.
+- `variants.test.ts` — the chit-pool invariant from §4.1 and its neighbors,
+  table-driven over the variant registry so every variant is covered (§9.8).
+  `settings.test.ts` pins the transcribed counts themselves.
 - `terrain.test.ts` / `numbers.test.ts` / `ports.test.ts` — per-terrain counts
   land within `[min, max]`; every resource hex gets a chit and no sea or desert
   hex does; ports only attach to sea-facing land hexes.
@@ -427,7 +465,7 @@ Update the status column in place as phases land.
 | 0   | Repo bootstrap and standards                   | ✅     |
 | 1   | Hex topology                                   | ✅     |
 | 1.5 | The local gate (`verify.sh`)                   | ✅     |
-| 2   | Randomness and settings                        | ⬜     |
+| 2   | Randomness and settings                        | ✅     |
 | 3   | Generation pipeline                            | ⬜     |
 | 4   | SVG rendering                                  | ⬜     |
 | 5   | Routes and controls                            | ⬜     |
@@ -493,8 +531,10 @@ definition of done, and no phase lands without it passing.
 
 ### Phase 2 — Randomness and settings
 
-Deliverables: `src/domain/rng.ts` (§5) and `settings.ts` (both variants), with
-tests.
+Deliverables: `src/domain/rng.ts` (§5), `settings.ts` (both variants), and
+`variants.ts` — the registry, pulled forward out of Phase 8 because §9.8's
+table-driven invariant only works if the registry lives in source rather than in
+a test file. With tests.
 
 **Done when:** the same seed reproduces an identical sequence across runs; the
 shuffle is demonstrably unbiased and can leave an element in place (§4.3); and
@@ -572,19 +612,22 @@ generator**. If Phase 9 or 10 requires touching `terrain.ts`, `numbers.ts`,
 leaked, and the right response is to fix the abstraction rather than
 special-case the variant.
 
-To make that true, one thing must be built correctly back in **Phase 2**: write
-the §4.1 chit-pool invariant test as a **table-driven test over a variant
-registry**, not as two hand-written cases. Then every variant added later is
-covered by it for free, and a mis-specified new board fails loudly at test time
-instead of rendering an `undefined` chit.
+To make that true, one thing had to be built correctly back in **Phase 2**, and
+was: `src/domain/variants.ts` holds the registry, and `variants.test.ts` is
+table-driven over it rather than over two hand-written cases. Every variant
+added later is covered for free by the chit-pool invariant, the fillability
+check, and the port-capacity check, so a mis-specified new board fails loudly at
+test time instead of rendering an `undefined` chit. Phase 2 proved that by
+mutation: mispairing Seafarers' settings with the Base Game shape fails the
+suite immediately.
 
 #### Phase 8 — Variant registry and player-count selector
 
 Make the variant a first-class parameter rather than two hardcoded routes.
 
-Deliverables: `src/domain/variants.ts` exporting a registry keyed by variant id
-(`base-game`, `base-game-56`, `seafarers`, `seafarers-56`), each entry pairing a
-shape with its settings and a display name; routes reworked to
+Deliverables: the Phase 2 registry in `src/domain/variants.ts` extended to all
+four ids (`base-game`, `base-game-56`, `seafarers`, `seafarers-56`), each entry
+pairing a shape with its settings and a display name; routes reworked to
 `src/app/[variant]/page.tsx` with `generateStaticParams` over the registry; a
 player-count control in `BoardControls.tsx` that switches between the 3–4 and
 5–6 entries of the current game and encodes it in the URL (`?players=6`), so a

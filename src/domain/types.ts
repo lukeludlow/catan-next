@@ -38,9 +38,17 @@ export type Hex = {
 export type TerrainCount = { min: number; max: number };
 
 export type MapSettings = {
+    // A range per terrain: the generator places `min` of each, then fills the
+    // rest of the board from a remainder bag, which is what makes sea and gold
+    // counts vary between boards (ROADMAP §11).
     terrainCounts: Readonly<Record<Terrain, TerrainCount>>;
+    // How many chits of each dice number the variant ships. There is no 7.
     diceNumbers: Readonly<Record<number, number>>;
-    ports: Readonly<Partial<Record<PortResource, TerrainCount>>>;
+    // Exact counts, not ranges. Every port count in every variant is fixed, and
+    // the original only ever read the `max` of its own port ranges
+    // (`_generators/port-generator.service.ts:29`) — so a range here would be a
+    // field nothing reads.
+    ports: Readonly<Partial<Record<PortResource, number>>>;
 };
 
 export type Board = {
