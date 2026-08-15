@@ -426,7 +426,7 @@ Update the status column in place as phases land.
 | --- | ---------------------------------------------- | ------ |
 | 0   | Repo bootstrap and standards                   | ✅     |
 | 1   | Hex topology                                   | ✅     |
-| 1.5 | The local gate (`verify.sh`)                   | ⬜     |
+| 1.5 | The local gate (`verify.sh`)                   | ✅     |
 | 2   | Randomness and settings                        | ⬜     |
 | 3   | Generation pipeline                            | ⬜     |
 | 4   | SVG rendering                                  | ⬜     |
