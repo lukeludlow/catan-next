@@ -61,3 +61,45 @@ export function neighbors<T>(hexes: ReadonlyMap<string, T>, at: Axial): T[] {
         .map((coord) => hexes.get(key(coord)))
         .filter((hex): hex is T => hex !== undefined);
 }
+
+// Cube distance: half the L1 norm of the cube vector, where the third cube axis
+// is the implied `-q - r`. Two hexes are adjacent iff this is 1, which is the
+// property that makes DIRECTIONS a legal direction set. terrain.ts uses it to
+// space island seeds apart before growing them.
+export function distance(a: Axial, b: Axial): number {
+    const q = a.q - b.q;
+    const r = a.r - b.r;
+
+    return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
+}
+
+// Every vertex of the board, as the three mutually adjacent coordinates that
+// meet there — which is what a Catan settlement sits on, and therefore the unit
+// the pip-balance rule is expressed in (docs/GENERATION.md).
+//
+// Coordinates in, coordinates out: returning payloads would mean either
+// constraining T to carry its own position or parsing keys, and there is
+// deliberately no inverse of `key`. Callers hold the map and can look up what
+// they need. Seafarers has 62 vertices, the Base Game 24.
+export function vertexTriples(coords: readonly Axial[]): Axial[][] {
+    const present = new Set(coords.map(key));
+    const found = new Map<string, Axial[]>();
+
+    for (const coord of coords) {
+        for (let side = 0; side < DIRECTIONS.length; side++) {
+            const corners = [
+                coord,
+                neighbor(coord, side as Direction),
+                neighbor(coord, ((side + 1) % DIRECTIONS.length) as Direction),
+            ];
+
+            if (!corners.every((corner) => present.has(key(corner)))) {
+                continue;
+            }
+
+            found.set(corners.map(key).sort().join(" "), corners);
+        }
+    }
+
+    return [...found.values()];
+}

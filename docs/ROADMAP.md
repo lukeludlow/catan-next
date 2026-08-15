@@ -181,8 +181,8 @@ topology is right.
 ## 4. Corrections and deliberate changes
 
 §4.2–4.6 and §4.8 are defects that exist in `~/ws/catan` today; do not carry
-them over. §4.7 is an intentional change in behavior. §4.1 was believed to be a
-defect and is not — see below.
+them over. §4.7 and §4.9 are intentional changes in behavior. §4.1 was believed
+to be a defect and is not — see below.
 
 **4.1 Dice chit shortage — investigated in Phase 2, and not real.** This section
 originally claimed Seafarers could exhaust its 28-chit bag, because
@@ -259,12 +259,27 @@ Two consequences to expect while building Phase 3:
   old size-3 rule; under this rule its true component count may be higher. Count
   the components in the fixture by hand and assert that.
 
-The remaining rejection loop — regenerate the whole board until island count and
-the 6/8 rule are both satisfied — is inherent to the design and stays. Bound it
-with a `maxAttempts` (start at 1000, and revisit once §4.7's effect on the
-acceptance rate is measured) and throw a typed error rather than spinning
-forever, which is what the current code does when the islands slider asks for an
-unlikely value.
+**Measured in Phase 3, and the rejection loop did not survive it.** The
+acceptance rate was measured over 300,000 Seafarers boards, and the effect
+predicted above is worse than "more attempts": at six islands — the top of the
+original's slider — only 0.045% of boards are accepted, about 2,000 attempts
+each, and seven islands is unreachable at any sane budget.
+
+| islands | accepted | attempts |
+| ------- | -------- | -------- |
+| 3       | 6.81%    | ~15      |
+| 5       | 0.51%    | ~197     |
+| 6       | 0.045%   | ~2,000   |
+| 7       | 0.001%   | ~100,000 |
+
+Rather than raise `maxAttempts` to cover that, both hard constraints are now
+satisfied **by construction**: islands are grown to the requested count and the
+6s and 8s are seated before the rest of the chits are dealt. `maxAttempts` stays
+at 1000 — guided placement is what makes that number right — and it still throws
+a typed error (`BoardGenerationError`) rather than spinning forever, which is
+what the original does when the slider asks for something unlikely. See
+`GENERATION.md` for the algorithms, the measurements, and the three balance
+rules added alongside them.
 
 **4.8 `listNeighbors` is wrong for two of the 42 Seafarers hexes.** Found in
 Phase 1 by running the original's own conversion, inverse, and bounds check
@@ -285,6 +300,25 @@ inverse is a lookup table with no notion of which coordinates exist.
 `hex.test.ts` keeps a regression for each (no hex is its own neighbor; no
 neighbor appears twice), and `shapes.test.ts` asserts the corrected neighbor
 sets for these two hexes by name.
+
+**4.9 Three balance rules the original never had** — added in Phase 3, on by
+default, and a deliberate change in what a generated board looks like rather
+than a fix to anything. They are enforceable at all only because §4.7's
+measurements forced the generator to be guided rather than to resample
+(`GENERATION.md`); under rejection sampling they would have compounded an
+already 0.045% acceptance rate into nothing.
+
+| Rule                     | Default | What it prevents                           |
+| ------------------------ | ------- | ------------------------------------------ |
+| `minIslandSize`          | 2       | A lone hex counting as one of your islands |
+| `noAdjacentEqualNumbers` | `true`  | Two 9s side by side                        |
+| `maxVertexPips`          | 12      | One overpowered opening settlement spot    |
+
+`minIslandSize` is the direct counterpart to §4.7: now that a single hex counts
+toward the requested total, the generator has to be stopped from producing one,
+or asking for six islands hands back five real ones and a rock. All three live
+in `BalanceRules` and can be relaxed per call, which is what keeps the
+original's exact behavior reproducible for comparison.
 
 ---
 
@@ -308,21 +342,34 @@ bag and let it travel to an `<img src>`. One correct `shuffle` also replaces
 `removeFirstOccurrence` outright (§4.2) — a bag is shuffled once and consumed,
 so nothing is ever removed by predicate.
 
-`generateBoard(settings, options, rng)` in `src/domain/generate.ts` runs:
+`generateBoard(variant, options, rng)` in `src/domain/generate.ts` runs:
 
 1. **`placeTerrain`** — build a minimums bag (each terrain × `min`), then a
-   remainder bag (each terrain × `max - min`); shuffle both; fill the shuffled
-   coordinate list. Preserves the original's variable sea/gold counts.
-2. **`placeNumbers`** — build the chit bag from `settings.diceNumbers`, shuffle,
-   deal onto shuffled resource hexes. Throw if the bag underruns (§4.1).
+   remainder bag (each terrain × `max - min`); shuffle both. Grow the requested
+   number of islands from spaced seeds and deal the resource terrains over them,
+   or scatter the whole bag when no island count is requested. Preserves the
+   original's variable sea/gold counts.
+2. **`placeNumbers`** — build the chit bag from `settings.diceNumbers`, seat the
+   6s and 8s apart, then deal the rest onto the remaining resource hexes. Throw
+   if the bag underruns (§4.1).
 3. **`placePorts`** — shuffle the port bag and the eligible-hex list; for each
    port, pick a random side from the hex's sea-facing sides. Keep the original's
    deliberate model: **a port belongs to a land hex plus a side**, not to a sea
    tile.
-4. **`validate`** — no two 6/8 hexes adjacent, and island count (DFS over
-   connected resource hexes, **every component counted regardless of size**,
-   §4.7) equals the requested count. Retry from step 1 on failure, up to
-   `maxAttempts`.
+4. **`validate`** — no two 6/8 hexes adjacent, island count (DFS over connected
+   resource hexes, **every component counted regardless of size**, §4.7) equal
+   to the requested count, and the three balance rules of §4.9. Re-deal on a
+   number failure, re-grow on a layout failure, up to `maxAttempts`.
+
+It takes the `Variant` rather than a bare `MapSettings` because step 1 needs the
+shape too, and `variants.ts` is the one place the two are paired — passing them
+as a unit makes mispairing unrepresentable.
+
+**`docs/GENERATION.md` is the design document for all of this**: why guided
+placement replaced the rejection sampling this section originally specified, the
+island-growth and chit-seating algorithms, the balance rules, the guarantees
+every board carries, and the measured cost. Read it before changing any of
+`terrain.ts`, `numbers.ts`, `ports.ts`, `validate.ts` or `generate.ts`.
 
 Settings live in `src/domain/settings.ts` as two plain objects. Seafarers keeps
 the original counts unchanged (§4.1); Base Game gets the counts from
@@ -416,7 +463,9 @@ intent instead.
 - `generate.test.ts` — **the payoff of seeding**: the same seed yields a
   byte-identical board, different seeds differ, and every board from a sample of
   ~200 seeds satisfies all invariants. This is the test the original could not
-  write.
+  write. Table-driven over the variant registry, and repeated across every
+  islands setting the slider offers — which is only affordable because §4.9's
+  guided placement made six islands as cheap as three.
 
 **Browser tier** — `BoardSvg.test.tsx` renders a board built from a fixed seed
 and asserts the right number of hex polygons, that a 6 and an 8 are never
@@ -466,7 +515,7 @@ Update the status column in place as phases land.
 | 1   | Hex topology                                   | ✅     |
 | 1.5 | The local gate (`verify.sh`)                   | ✅     |
 | 2   | Randomness and settings                        | ✅     |
-| 3   | Generation pipeline                            | ⬜     |
+| 3   | Generation pipeline                            | ✅     |
 | 4   | SVG rendering                                  | ⬜     |
 | 5   | Routes and controls                            | ⬜     |
 | 6   | CI and docs                                    | ⬜     |
@@ -545,7 +594,9 @@ the chit-pool invariant from §4.1 passes for both variants — written
 ### Phase 3 — Generation pipeline
 
 Deliverables: `terrain.ts` → `numbers.ts` → `ports.ts` → `validate.ts` →
-`generate.ts`, each with its test, in that order.
+`generate.ts`, each with its test, in that order. Plus `distance` and
+`vertexTriples` in `hex.ts`, `BalanceRules` in `types.ts`, and
+`docs/GENERATION.md`.
 
 **Done when:** `generate.test.ts` shows a fixed seed producing a byte-identical
 board across runs, and a ~200-seed sample where every board satisfies every
@@ -553,6 +604,12 @@ invariant — terrain counts within `[min, max]`, every resource hex numbered, n
 sea or desert numbered, no adjacent 6/8, island count as requested, ports only
 on sea-facing land. At this point the whole generator exists with **no React and
 no DOM anywhere in it**.
+
+**Landed.** The rejection sampling §5 specified was measured and replaced with
+guided placement — see §4.7, §4.9 and `GENERATION.md`. Beyond the invariants
+above, every board also satisfies the three balance rules, and a 35,000-board
+sweep across both variants and every islands setting produced no failure at
+0.42–1.47 ms per board.
 
 ### Phase 4 — SVG rendering
 
@@ -672,15 +729,24 @@ implementing scenarios.
 Deliverables: the expanded shape in `shapes.ts`; a `seafarers56` entry in
 `settings.ts`; tests.
 
-Two things to watch, both consequences of §4.7 now counting every island:
+Two things to watch, and re-measure into `GENERATION.md`:
 
-- The bigger board makes stray single-hex islands **more** likely, so the
-  acceptance rate of the rejection loop drops. Measure it before picking
-  `maxAttempts` for this variant; it may need its own value rather than the
-  shared default.
+- The bigger frame is where the farthest-point seeding gets tight, so growth may
+  stall more often at the top of the slider and this variant may want its own
+  `maxAttempts` rather than the shared default. (Single-hex islands are no
+  longer the risk they were under §4.7 — §4.9's size floor removes them at
+  construction — but a larger board with more islands is exactly where the
+  grower has the least room.)
 - Sea's `min` must again be set so the maximum possible resource-hex count stays
   within the chit pool (§4.1). Derive it rather than guess: the registry test
   will fail if it is wrong.
+- More land means more vertices and a longer pip tail, so §4.9's 12-pip cap may
+  reject more than it usefully constrains. Re-measure before shipping.
+
+**The slider is worth extending to 7.** Rejection sampling could not reach seven
+islands at all; guided growth succeeds on 5.1% of single attempts, which the
+retry loop covers comfortably. Measure it against the 5–6 player frame before
+exposing it in Phase 8's controls.
 
 **Done when:** the variant generates within a sane attempt budget across a
 ~200-seed sample at every islands setting the slider offers, and all invariants
@@ -733,6 +799,14 @@ Recorded so a future reader does not "fix" them by accident:
 - **Terrain counts vary run to run.** The remainder bag is larger than the
   number of slots left to fill, so leftovers go unplaced — this is what makes
   sea and gold counts differ between boards, and it is intentional.
+
+Not carried forward, and equally deliberate: the three balance rules of §4.9 are
+**new**, so a board from this app will not look like one from
+`lukeludlow.github.io/catan` even at the same island count. Islands are blobbier
+and never a lone hex, adjacent hexes never share a number, and no single
+settlement spot is worth more than 12 pips. §10.5's side-by-side comparison
+should check tile counts and chit distribution for plausibility, not expect the
+two generators to agree on board character.
 
 ## 12. Out of scope
 

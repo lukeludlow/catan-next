@@ -2,18 +2,17 @@ import { describe, expect, test } from "vitest";
 import {
     DIRECTIONS,
     Direction,
+    distance,
     key,
     neighbor,
     neighborCoords,
     neighbors,
+    vertexTriples,
 } from "@/domain/hex";
 import type { Axial } from "@/domain/hex";
+import { BASE_GAME_SHAPE, SEAFARERS_SHAPE } from "@/domain/shapes";
 
-// Cube distance from the origin. A coordinate is adjacent to the origin iff
-// this is 1, which is the property that makes DIRECTIONS a legal direction set.
-function cubeLength({ q, r }: Axial): number {
-    return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
-}
+const ORIGIN: Axial = { q: 0, r: 0 };
 
 function mapOf(coords: readonly Axial[]): Map<string, Axial> {
     return new Map(coords.map((coord) => [key(coord), coord]));
@@ -27,7 +26,7 @@ describe("DIRECTIONS", () => {
 
     test("every step is one hex away", () => {
         for (const step of DIRECTIONS) {
-            expect(cubeLength(step)).toBe(1);
+            expect(distance(step, ORIGIN)).toBe(1);
         }
     });
 
@@ -99,9 +98,7 @@ describe("neighborCoords", () => {
         const at = { q: -3, r: 4 };
 
         for (const coord of neighborCoords(at)) {
-            expect(cubeLength({ q: coord.q - at.q, r: coord.r - at.r })).toBe(
-                1,
-            );
+            expect(distance(coord, at)).toBe(1);
         }
     });
 });
@@ -152,5 +149,97 @@ describe("neighbors", () => {
         const found = neighbors(hexes, at).map(key);
 
         expect(new Set(found).size).toBe(found.length);
+    });
+});
+
+describe("distance", () => {
+    test("is zero from a hex to itself", () => {
+        expect(distance({ q: -3, r: 4 }, { q: -3, r: 4 })).toBe(0);
+    });
+
+    test("is one between adjacent hexes and symmetric", () => {
+        const at = { q: 2, r: -1 };
+
+        for (const coord of neighborCoords(at)) {
+            expect(distance(at, coord)).toBe(1);
+            expect(distance(coord, at)).toBe(1);
+        }
+    });
+
+    // The third cube axis is the implied -q - r, so a step that changes q and r
+    // in the same direction covers two hexes rather than one. A naive
+    // (|dq| + |dr|) / 2 would call this 2 as well, but would call (1, 1) a
+    // distance of 1 — the case that separates cube distance from L1.
+    test("counts diagonal steps along the implied third axis", () => {
+        expect(distance({ q: 0, r: 0 }, { q: 2, r: 0 })).toBe(2);
+        expect(distance({ q: 0, r: 0 }, { q: 1, r: 1 })).toBe(2);
+        expect(distance({ q: 0, r: 0 }, { q: -3, r: 6 })).toBe(6);
+    });
+
+    test("agrees with counting neighbor steps", () => {
+        const start = { q: 1, r: -1 };
+        const twoEast = neighbor(
+            neighbor(start, Direction.East),
+            Direction.East,
+        );
+
+        expect(distance(start, twoEast)).toBe(2);
+    });
+});
+
+describe("vertexTriples", () => {
+    test("finds nothing when no three hexes meet", () => {
+        expect(vertexTriples([])).toEqual([]);
+        expect(vertexTriples([{ q: 0, r: 0 }])).toEqual([]);
+        expect(
+            vertexTriples([
+                { q: 0, r: 0 },
+                { q: 1, r: 0 },
+            ]),
+        ).toEqual([]);
+    });
+
+    test("finds the single vertex where three hexes meet", () => {
+        const triple = vertexTriples([
+            { q: 0, r: 0 },
+            { q: 1, r: 0 },
+            { q: 0, r: 1 },
+        ]);
+
+        expect(triple).toHaveLength(1);
+        expect(triple[0].map(key).sort()).toEqual(["0,0", "0,1", "1,0"]);
+    });
+
+    // A hex surrounded by all six neighbors sits on six vertices, one per pair
+    // of consecutive directions — and each is found three times over, once from
+    // every corner, so this is also the deduplication test.
+    test("finds six vertices around a fully surrounded hex", () => {
+        const at = { q: 0, r: 0 };
+
+        expect(vertexTriples([at, ...neighborCoords(at)])).toHaveLength(6);
+    });
+
+    test("returns three mutually adjacent coordinates per vertex", () => {
+        for (const corners of vertexTriples(SEAFARERS_SHAPE)) {
+            expect(corners).toHaveLength(3);
+            expect(distance(corners[0], corners[1])).toBe(1);
+            expect(distance(corners[1], corners[2])).toBe(1);
+            expect(distance(corners[0], corners[2])).toBe(1);
+        }
+    });
+
+    test("never returns the same vertex twice", () => {
+        const ids = vertexTriples(SEAFARERS_SHAPE).map((corners) =>
+            corners.map(key).sort().join(" "),
+        );
+
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    // Pinned so a change to either shape that quietly alters how many
+    // settlement spots exist shows up here rather than in a balance rule.
+    test("counts the vertices of both boards", () => {
+        expect(vertexTriples(BASE_GAME_SHAPE)).toHaveLength(24);
+        expect(vertexTriples(SEAFARERS_SHAPE)).toHaveLength(62);
     });
 });

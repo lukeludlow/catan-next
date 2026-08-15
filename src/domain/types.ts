@@ -51,6 +51,22 @@ export type MapSettings = {
     ports: Readonly<Partial<Record<PortResource, number>>>;
 };
 
+// Constraints the generator holds a finished board to, over and above the
+// official no-adjacent-6/8 rule. All three are new in this port — the Angular
+// original enforced none of them (docs/GENERATION.md). They are settings rather
+// than constants so a variant, or a test, can relax one.
+export type BalanceRules = {
+    // No landmass smaller than this. ROADMAP §4.7 made single-hex islands count
+    // toward the requested total; this keeps them from being what the player
+    // gets.
+    minIslandSize: number;
+    // No two adjacent hexes carrying the same dice number.
+    noAdjacentEqualNumbers: boolean;
+    // The most pips a single settlement spot may be worth, summed over the
+    // three hexes meeting at that vertex. A 6 or 8 is 5 pips, a 2 or 12 is 1.
+    maxVertexPips: number;
+};
+
 export type Board = {
     hexes: Map<string, Hex>;
     settings: MapSettings;

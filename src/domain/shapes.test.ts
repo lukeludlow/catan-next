@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { key, neighborCoords, neighbors } from "@/domain/hex";
+import { distance, key, neighborCoords, neighbors } from "@/domain/hex";
 import type { Axial } from "@/domain/hex";
 import { BASE_GAME_SHAPE, SEAFARERS_SHAPE } from "@/domain/shapes";
 
@@ -102,9 +102,8 @@ describe("base game shape", () => {
     // Confirms the row ranges really do describe a hexagon of radius 2, rather
     // than trusting that the five ranges were transcribed correctly.
     test("is a hexagon of radius 2", () => {
-        for (const { q, r } of BASE_GAME_SHAPE) {
-            const radius = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            expect(radius).toBeLessThanOrEqual(2);
+        for (const coord of BASE_GAME_SHAPE) {
+            expect(distance(coord, { q: 0, r: 0 })).toBeLessThanOrEqual(2);
         }
     });
 
