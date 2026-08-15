@@ -1,49 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with
-[`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# catan-next
 
-## Getting Started
+A Catan board generator — Base Game and Seafarers — built with Next.js, React
+and inline SVG. It is a port of the Angular 9 app at
+[`lukeludlow.github.io/catan`](https://lukeludlow.github.io/catan), rewritten
+around axial hex coordinates rather than transliterated.
 
-First, run the development server:
+**The URL is the board.** Every board is a pure function of
+`(variant, seed, islands)`, and all three live in the address bar:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+/seafarers?seed=k3f9qz&islands=4
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the
-result.
+That link renders the same 42 hexes, the same chits and the same harbours on
+every reload, on every device, for every person you send it to. The original
+could not offer that — it called `Math.random()` from inside four services and
+kept the board only as DOM it had already thrown away.
 
-You can start editing the page by modifying `app/page.tsx`. The page
-auto-updates as you edit the file.
+## Quick start
 
-This project uses
-[`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts)
-to automatically optimize and load [Geist](https://vercel.com/font), a new font
-family for Vercel.
+Node 22 (pinned in `.nvmrc` and `engines`), npm only — no yarn, pnpm or bun
+lockfile is maintained here.
 
-## Learn More
+```bash
+nvm use          # or any Node >= 22
+npm ci
+npm run dev      # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+For the browser test tier you also need the engines once:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx playwright install
+```
 
-You can check out
-[the Next.js GitHub repository](https://github.com/vercel/next.js) - your
-feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
+| Command                | What it does                              |
+| ---------------------- | ----------------------------------------- |
+| `npm run dev`          | Dev server on port 3000                   |
+| `npm run build`        | Production build                          |
+| `npm start`            | Serve a production build                  |
+| `npm test`             | Both test tiers, headless                 |
+| `npm run test:unit`    | The fast tier only                        |
+| `npm run test:browser` | The browser tier, headed and watching     |
+| `npm run lint`         | ESLint                                    |
+| `npm run typecheck`    | `tsc --noEmit`                            |
+| `npm run format`       | Prettier, writing                         |
+| `./verify.sh`          | **All of the above, in order, fail-fast** |
 
-The easiest way to deploy your Next.js app is to use the
-[Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme)
-from the creators of Next.js.
+`./verify.sh` is the definition of done. It runs lint → format check → typecheck
+→ unit tests → browser tests → build, and stops at the first red stage.
+`.github/workflows/ci.yml` is a thin wrapper around that same script, so CI
+cannot drift from what runs locally.
 
-Check out our
-[Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying)
-for more details.
+## Testing
+
+**The file extension selects the tier**, which is the one convention worth
+knowing before you add a test:
+
+- `*.test.ts` → the `unit` project. Fast, `happy-dom`, no browser. This is where
+  the generator's coverage lives.
+- `*.test.tsx` → the `browser` project. Real Chromium, Firefox and WebKit via
+  Playwright, for anything that renders.
+
+Tests sit next to the code they cover — `foo.ts` beside `foo.test.ts`, no
+`__tests__/` directories.
+
+## Layout
+
+```
+src/
+  app/          routes — server components; the board is generated here
+  routing/      the query-string contract, both directions
+  components/   presentational SVG board, plus the two client controls
+  domain/       the generator: pure TypeScript, no React, no DOM
+```
+
+`src/domain/` is pure by enforcement rather than by convention — ESLint bans it
+from importing React or route code, and nothing in it may call `Math.random()`.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the layers and the rules
+that hold them apart.
+
+## Docs
+
+| File                                           | Answers                                            |
+| ---------------------------------------------- | -------------------------------------------------- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organized, and what enforces it    |
+| [`docs/GENERATION.md`](docs/GENERATION.md)     | How a seed becomes a board, and what it guarantees |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md)           | Why each decision was taken, phase by phase        |
+| [`CLAUDE.md`](CLAUDE.md)                       | The house rules, in seven lines                    |
+
+## Deployment
+
+Vercel — **not yet live.** The deploy is Phase 7 of the roadmap; until it lands,
+the running app is still the Angular one on GitHub Pages.
