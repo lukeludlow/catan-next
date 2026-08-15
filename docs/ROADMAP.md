@@ -388,11 +388,18 @@ URL.
 
 ---
 
-## 8. CI and deployment
+## 8. The gate, CI, and deployment
 
 **`verify.sh`** at the repo root, same `stage()` helper and fail-fast structure
 as the reference's, running: `eslint .` → `prettier --check .` → `tsc --noEmit`
 → `vitest run --project unit` → `vitest run --project browser` → `next build`.
+
+The gate and the CI that wraps it land at different times on purpose. Every
+stage above already works as of Phase 0, so **`verify.sh` lands in Phase 1.5**
+and each phase from 2 onward ends on one command instead of five remembered
+ones. CI and Vercel stay in Phases 6 and 7: the workflow is a thin wrapper with
+nothing to wrap until the gate has proven itself locally, and there is no reason
+to be debugging a runner while the generator is still being written.
 
 **`.github/workflows/ci.yml`** — the reference deliberately has no CI; we add
 one here, and it is a thin wrapper so the two never drift: checkout,
@@ -419,11 +426,12 @@ Update the status column in place as phases land.
 | --- | ---------------------------------------------- | ------ |
 | 0   | Repo bootstrap and standards                   | ✅     |
 | 1   | Hex topology                                   | ✅     |
+| 1.5 | The local gate (`verify.sh`)                   | ⬜     |
 | 2   | Randomness and settings                        | ⬜     |
 | 3   | Generation pipeline                            | ⬜     |
 | 4   | SVG rendering                                  | ⬜     |
 | 5   | Routes and controls                            | ⬜     |
-| 6   | Gate and CI                                    | ⬜     |
+| 6   | CI and docs                                    | ⬜     |
 | 7   | Vercel deploy                                  | ⬜     |
 | —   | _milestone: parity with the old app, deployed_ |        |
 | 8   | Variant registry and player-count selector     | ⬜     |
@@ -435,9 +443,9 @@ capability the original never had (§9.8 explains why they are cheap once §3 ha
 landed) and can be picked up in later sessions without disturbing 0–7.
 
 **Definition of done, every phase:** new code has co-located tests,
-`./verify.sh` passes end to end (from Phase 6 onward; before that, the stages
-that exist), and the work is committed. A phase that ends red does not count as
-landed.
+`./verify.sh` passes end to end, and the work is committed. Phases 0 and 1
+predate the script and run its stages by hand instead. A phase that ends red
+does not count as landed.
 
 ### Phase 0 — Repo bootstrap and standards
 
@@ -467,6 +475,21 @@ coordinate lists), plus `hex.test.ts` and `shapes.test.ts`.
 neighbors, hex `(3,1)` has exactly 6 and they are the expected six. Base Game is
 19 hexes, Seafarers 42, no duplicate coordinates, adjacency symmetric. **Do not
 start Phase 2 until this passes.**
+
+### Phase 1.5 — The local gate
+
+Pulled forward out of Phase 6 (§8). Every stage it runs already works, and the
+phases that follow are where a silent regression is most likely, so the gate
+should exist before them rather than after.
+
+Deliverables: `verify.sh` at the repo root, executable, no arguments — the
+reference's `stage()` helper and fail-fast structure, minus its `--dist`/`--db`
+flags, which have no analogue here.
+
+**Done when:** `./verify.sh` runs all six stages green in the §8 order, and
+fails closed — breaking one file's formatting stops the run at `✘ FAIL format`
+with exit code 1 rather than carrying on. From here on this script is the
+definition of done, and no phase lands without it passing.
 
 ### Phase 2 — Randomness and settings
 
@@ -510,13 +533,18 @@ share-link affordance.
 `npm run build` shows the board routes as dynamic — confirming the generator
 stayed on the server.
 
-### Phase 6 — Gate and CI
+### Phase 6 — CI and docs
 
-Deliverables: `verify.sh`, `.github/workflows/ci.yml`, `README.md`, and any
+`verify.sh` itself landed back in Phase 1.5; what is left is running it
+somewhere other than this laptop.
+
+Deliverables: `.github/workflows/ci.yml`, `README.md`, and any
 `docs/ARCHITECTURE.md` detail that outgrew this file.
 
-**Done when:** `./verify.sh` passes every stage from a clean `npm ci`, and the
-workflow goes green on a pushed branch.
+**Done when:** the workflow goes green on a pushed branch — which is also the
+first time `./verify.sh` runs from a clean `npm ci` and a cold
+`npx playwright install --with-deps`, the two things a local run never
+exercises.
 
 ### Phase 7 — Vercel deploy
 
