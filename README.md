@@ -45,7 +45,7 @@ npx playwright install
 | `npm run test:unit`    | The fast tier only                        |
 | `npm run test:browser` | The browser tier, headed and watching     |
 | `npm run lint`         | ESLint                                    |
-| `npm run typecheck`    | `tsc --noEmit`                            |
+| `npm run typecheck`    | Route typegen, then `tsc --noEmit`        |
 | `npm run format`       | Prettier, writing                         |
 | `./verify.sh`          | **All of the above, in order, fail-fast** |
 

@@ -28,9 +28,14 @@ stage() {
 
 stage "lint" npx eslint .
 stage "format" npx prettier --check .
-# --noEmit rather than the reference's `tsc -b`: one tsconfig, no project
-# references, and it matches the `typecheck` script in package.json.
-stage "typecheck" npx tsc --noEmit
+# Through `npm run typecheck` rather than a bare `npx tsc --noEmit`, so the
+# script and package.json cannot disagree about what typechecking includes —
+# and it now includes a `next typegen` first. `PageProps` and `LayoutProps` are
+# globals Next generates into `.next/types/`, which tsconfig includes: any
+# machine that has ever run `next dev` has them and never notices, and a clean
+# checkout does not. That is exactly the gap this script existed to close, and
+# CI found it on its first run.
+stage "typecheck" npm run typecheck
 stage "unit tests" npx vitest run --project unit
 stage "browser tests" npx vitest run --project browser
 stage "build" npm run build

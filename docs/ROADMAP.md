@@ -483,8 +483,9 @@ URL.
 ## 8. The gate, CI, and deployment
 
 **`verify.sh`** at the repo root, same `stage()` helper and fail-fast structure
-as the reference's, running: `eslint .` → `prettier --check .` → `tsc --noEmit`
-→ `vitest run --project unit` → `vitest run --project browser` → `next build`.
+as the reference's, running: `eslint .` → `prettier --check .` →
+`npm run typecheck` (`next typegen && tsc --noEmit`, see Phase 6) →
+`vitest run --project unit` → `vitest run --project browser` → `next build`.
 
 The gate and the CI that wraps it land at different times on purpose. Every
 stage above already works as of Phase 0, so **`verify.sh` lands in Phase 1.5**
@@ -724,6 +725,22 @@ what drifts. Four decisions, plus a documentation split:
   catch.
 - **`concurrency` with `cancel-in-progress`**, keyed on the ref. The gate is
   all-or-nothing, so a superseded push has nothing worth finishing.
+
+**The first run went red, and it was right to.** `verify.sh` had passed on this
+laptop for five phases while being unrunnable on a clean checkout: `PageProps`
+and `LayoutProps` are globals Next generates into `.next/types/`, which
+`tsconfig.json` includes, so any machine that has ever run `next dev` has them
+and never learns that `tsc --noEmit` alone is not a complete typecheck. CI has
+no `.next/`, and the typecheck stage failed in ten seconds with three
+`TS2304: Cannot find name 'PageProps'`.
+
+The fix is one word in `package.json` — `typecheck` is now
+`next typegen && tsc --noEmit` — plus `verify.sh` calling `npm run typecheck`
+rather than restating the command, so the script and the manifest cannot
+disagree about what typechecking includes. **This is the entire justification
+for the phase**: the gate was measuring the machine it ran on, and nothing local
+could have revealed that. The stage order is unchanged — typecheck still runs
+before the tests, and `next build` is still last.
 
 The docs now answer questions at three depths, which is what "any
 `docs/ARCHITECTURE.md` detail that outgrew this file" turned out to mean:

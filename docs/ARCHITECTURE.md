@@ -187,7 +187,7 @@ color assertion could fail.
 `./verify.sh` runs six stages, fail-fast, in this order:
 
 ```
-eslint .  →  prettier --check .  →  tsc --noEmit
+eslint .  →  prettier --check .  →  typegen + tsc --noEmit
           →  vitest unit  →  vitest browser  →  next build
 ```
 
@@ -195,3 +195,9 @@ It is the definition of done: no phase lands without it green.
 `.github/workflows/ci.yml` is a thin wrapper that installs Node, `npm ci`s,
 installs the Playwright engines and calls the same script — so CI and local
 cannot disagree about what passing means.
+
+The typecheck stage goes through `npm run typecheck`, which runs `next typegen`
+before `tsc`. `PageProps` and `LayoutProps` are globals Next generates into
+`.next/types/`; a machine that has ever run `next dev` has them and a clean
+checkout does not, so without the typegen the stage passes forever locally and
+fails on a fresh clone.
