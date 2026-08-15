@@ -3,6 +3,35 @@
 :root {
     --background: #ffffff;
     --foreground: #171717;
+
+    /* The board's palette (ROADMAP §6). One token per `Terrain`, plus the chit
+     * and port colors, replacing the original's ~30 tile PNGs outright.
+     *
+     * Deliberately in this plain `:root` block rather than in `@theme` below:
+     * these are read as `var(--terrain-…)` from inline styles on SVG shapes,
+     * not through Tailwind utility classes, and Tailwind v4 drops theme tokens
+     * it cannot see being used.
+     *
+     * These do *not* get a dark-scheme override. Terrain color is the board's
+     * identity — a forest is green on a phone at night too — and the tiles tile
+     * the whole figure, so there is no page background showing through to
+     * clash with. Only --hex-stroke, which separates tile from tile, adapts. */
+    --terrain-brick: #b4553a;
+    --terrain-desert: #e2cfa1;
+    --terrain-gold: #d6a325;
+    --terrain-rock: #8d99a6;
+    --terrain-sea: #2f7fb8;
+    --terrain-sheep: #9dc46a;
+    --terrain-tree: #2f6b3a;
+    --terrain-wheat: #e8c14a;
+
+    --hex-stroke: rgba(15, 23, 42, 0.35);
+    --chit-face: #f5ecd7;
+    --chit-ink: #1c1917;
+    /* 6 and 8 in red, per Catan convention. */
+    --chit-hot: #b91c1c;
+    /* The 3:1 harbour, which trades no particular resource. */
+    --port-any: #6b7280;
 }
 
 @theme inline {
@@ -16,6 +45,7 @@
     :root {
         --background: #0a0a0a;
         --foreground: #ededed;
+        --hex-stroke: rgba(248, 250, 252, 0.35);
     }
 }
 

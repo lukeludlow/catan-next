@@ -431,10 +431,15 @@ tier**:
 // vitest.config.ts — two projects
 { name: "unit",    environment: "happy-dom", include: ["src/**/*.test.ts"] }
 { name: "browser", include: ["src/**/*.test.tsx"],
+  setupFiles: ["./src/test/browserSetup.ts"],
   browser: { enabled: true, headless: true, provider: playwright(),
              instances: [{ browser: "chromium" }, { browser: "firefox" },
                          { browser: "webkit" }] } }
 ```
+
+The browser project's setup file loads `globals.css` and nothing else (added in
+Phase 4). The board draws in CSS custom properties, so without the stylesheet in
+the page every `var()` would resolve to black and no color assertion could fail.
 
 Scripts follow the reference: `test` runs both projects, plus `test:unit` and
 `test:browser` (headed, watch). No coverage gate, matching the reference — the
@@ -516,7 +521,7 @@ Update the status column in place as phases land.
 | 1.5 | The local gate (`verify.sh`)                   | ✅     |
 | 2   | Randomness and settings                        | ✅     |
 | 3   | Generation pipeline                            | ✅     |
-| 4   | SVG rendering                                  | ⬜     |
+| 4   | SVG rendering                                  | ✅     |
 | 5   | Routes and controls                            | ⬜     |
 | 6   | CI and docs                                    | ⬜     |
 | 7   | Vercel deploy                                  | ⬜     |
@@ -619,6 +624,31 @@ Deliverables: `src/domain/layout.ts`, `src/components/board/BoardSvg.tsx`,
 **Done when:** a board is visible for the first time — the browser tier renders
 a fixed-seed board across Chromium, Firefox, and WebKit, with the right polygon
 count, correct `aria-label`s, red 6/8 chits, and no two 6/8 adjacent.
+
+**Landed.** Three decisions worth recording, all taken during the phase:
+
+- **The palette is CSS custom properties** (`--terrain-wheat` and friends) in
+  `globals.css`, referenced from a single `boardColors.ts` whose
+  `Record<Terrain, string>` is what makes a missing terrain a type error. They
+  live in the plain `:root` block rather than in `@theme`, because Tailwind v4
+  drops theme tokens it cannot see used and nothing here uses a utility class.
+  Terrain colors do not get a dark-scheme override — only `--hex-stroke` does.
+- **Shapes are filled through `style={{ fill }}`, never a `fill="var(…)"`
+  presentation attribute**, which is not honored across all three browsers in
+  the tier. This is the one line in the phase that a reviewer might "simplify"
+  back into a bug, so each component says so where it happens.
+- **Tiles carry `data-q`/`data-r`/`data-number`.** The 6/8 rule is a claim about
+  what is on screen, so `BoardSvg.test.tsx` reads the coordinates back out of
+  the DOM and checks it there; asserting against the `Board` the markup was
+  built from would only prove the generator right a second time.
+
+Two deliverables were added beyond the list above: `hexLabel.ts` and
+`boardColors.ts` are plain `.ts` modules precisely so their logic — accessible
+names, and which numbers are red — is covered by the fast unit tier rather than
+by three browser launches. The browser project gained a `setupFiles` entry
+(`src/test/browserSetup.ts`) that imports `globals.css`; without the stylesheet
+in the page, every `var()` would resolve to black and no color assertion could
+fail. `src/test/smoke.test.tsx` is deleted, as its own comment anticipated.
 
 ### Phase 5 — Routes and controls
 

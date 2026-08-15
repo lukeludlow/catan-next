@@ -32,6 +32,10 @@ export default defineConfig({
                 test: {
                     name: "browser",
                     include: ["src/**/*.test.tsx"],
+                    // The board draws with CSS custom properties, so the
+                    // stylesheet has to be in the page before anything can be
+                    // asserted about color.
+                    setupFiles: ["./src/test/browserSetup.ts"],
                     browser: {
                         enabled: true,
                         headless: true,
