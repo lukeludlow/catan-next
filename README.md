@@ -1,9 +1,9 @@
 # catan-next
 
 A Catan board generator — Base Game and Seafarers — built with Next.js, React
-and inline SVG. It is a port of the Angular 9 app at
-[`lukeludlow.github.io/catan`](https://lukeludlow.github.io/catan), rewritten
-around axial hex coordinates rather than transliterated.
+and inline SVG. It is a port of the Angular 9 app archived at
+[`lukeludlow/catan`](https://github.com/lukeludlow/catan), rewritten around
+axial hex coordinates rather than transliterated.
 
 **The URL is the board.** Every board is a pure function of
 `(variant, seed, islands)`, and all three live in the address bar:
@@ -95,5 +95,6 @@ that hold them apart.
 
 Vercel — **live at [catan-next.vercel.app](https://catan-next.vercel.app)**.
 Every push to `main` deploys to production; every pull request gets its own
-preview deployment. The original Angular app remains at
-[`lukeludlow.github.io/catan`](https://lukeludlow.github.io/catan) for now.
+preview deployment. The original Angular app has been retired: its repo is
+archived at [`lukeludlow/catan`](https://github.com/lukeludlow/catan), and
+`lukeludlow.github.io/catan` now redirects here.

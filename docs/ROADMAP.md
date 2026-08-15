@@ -790,9 +790,20 @@ promotes a brand-new project's very first deployment to production regardless of
 which branch triggered it, since there is no prior production deployment to
 compare against. Merging the PR triggered a second deployment from `main`, which
 took over the production alias as expected — this only matters for a project's
-first-ever deploy, and does not recur afterward. The GitHub Pages app at
-`lukeludlow.github.io/catan` is left running; retiring it is a separate
-decision, not part of this phase's done condition.
+first-ever deploy, and does not recur afterward.
+
+**Follow-up: the old app is now retired.** With the Vercel deploy verified, the
+separate decision this phase deferred was taken. `gh-pages` on
+`lukeludlow/catan` no longer serves the compiled Angular bundle — its whole tree
+was replaced with a hand-written redirect to `catan-next.vercel.app`, duplicated
+as `404.html` so deep links bounce too. The 26 open `dependabot/*` branches were
+deleted, and the repo was archived with Dependabot alerts, security updates and
+the dependency graph all switched off; that repo carried 351 open advisories and
+was mailing about them. Nothing there was ever installed or built to do this:
+the redirect commit was assembled with `hash-object`/`mktree`/`commit-tree` and
+pushed straight to the remote, so the Angular dependency tree was never resolved
+on any machine. Archiving leaves the Pages site serving, so the redirect
+survives it.
 
 ### 9.8 Player-count support (Phases 8–10)
 
