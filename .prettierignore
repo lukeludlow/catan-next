@@ -1,0 +1,9 @@
+# Tool-local config — not project source.
+.claude/
+# Build and test artifacts.
+.next/
+out/
+coverage/
+next-env.d.ts
+# Written and re-added by `next dev`, not ours to format.
+AGENTS.md

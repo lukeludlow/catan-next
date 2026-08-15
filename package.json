@@ -1,0 +1,42 @@
+{
+    "name": "catan-next",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint",
+        "typecheck": "tsc --noEmit",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "test": "vitest run --project unit --project browser",
+        "test:unit": "vitest run --project unit",
+        "test:browser": "vitest --project browser --browser.headless=false"
+    },
+    "dependencies": {
+        "next": "16.3.1",
+        "react": "19.2.8",
+        "react-dom": "19.2.8"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react": "^6.0.5",
+        "@vitest/browser-playwright": "^4.1.10",
+        "eslint": "^9.39.5",
+        "eslint-config-next": "16.3.1",
+        "happy-dom": "^20.11.2",
+        "prettier": "^3.9.6",
+        "tailwindcss": "^4",
+        "typescript": "^5",
+        "vitest": "^4.1.10",
+        "vitest-browser-react": "^2.2.0"
+    }
+}
