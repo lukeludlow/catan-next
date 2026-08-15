@@ -52,5 +52,7 @@
 body {
     background: var(--background);
     color: var(--foreground);
-    font-family: Arial, Helvetica, sans-serif;
+    /* The font layout.tsx loads, rather than the create-next-app leftover that
+     * named Arial while the variable went unused. */
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
 }

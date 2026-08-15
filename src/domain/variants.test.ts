@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { RESOURCE_TERRAINS } from "@/domain/settings";
 import type { MapSettings, Terrain } from "@/domain/types";
-import { ALL_VARIANTS, VARIANTS } from "@/domain/variants";
+import { ALL_VARIANTS, VARIANTS, variantById } from "@/domain/variants";
 import type { Variant, VariantId } from "@/domain/variants";
 
 // These helpers mirror the bag algorithm the generator will run in Phase 3:
@@ -149,6 +149,42 @@ describe.each(ALL_VARIANTS)("$name", (variant) => {
             expect(count).toBeGreaterThan(0);
         }
     });
+
+    // The islands control reads its bounds off the registry (Phase 5), so a
+    // range that disagreed with itself would put a setting on screen that the
+    // generator cannot satisfy.
+    test("offers a sane islands range, or none at all", () => {
+        if (variant.islands === undefined) {
+            return;
+        }
+
+        const { min, max, default: fallback } = variant.islands;
+
+        expect(min).toBeGreaterThanOrEqual(1);
+        expect(min).toBeLessThanOrEqual(fallback);
+        expect(fallback).toBeLessThanOrEqual(max);
+    });
+
+    // A slider on a board that cannot contain sea would be a control with
+    // nothing to control: with no sea in the bag every hex is land and the
+    // board is one landmass whatever the URL asks for.
+    test("offers an islands range only if it can have sea", () => {
+        expect(variant.islands !== undefined).toBe(
+            settings.terrainCounts.sea.max > 0,
+        );
+    });
+
+    // The whole board is land minus the sea maximum, so an islands ceiling
+    // above that is unreachable however many attempts the generator spends.
+    test("cannot ask for more islands than it has land", () => {
+        if (variant.islands === undefined) {
+            return;
+        }
+
+        expect(variant.islands.max).toBeLessThanOrEqual(
+            shape.length - settings.terrainCounts.sea.min,
+        );
+    });
 });
 
 describe("the registry", () => {
@@ -177,4 +213,19 @@ describe("the registry", () => {
         expect(VARIANTS["base-game"].shape).toHaveLength(19);
         expect(VARIANTS.seafarers.shape).toHaveLength(42);
     });
+
+    // What the `/[variant]` route does with a URL segment, and the reason it
+    // can 404 rather than generate a board for a variant that does not exist.
+    test("finds every variant by its own id", () => {
+        for (const variant of ALL_VARIANTS) {
+            expect(variantById(variant.id)).toBe(variant);
+        }
+    });
+
+    test.each(["", "nonsense", "Seafarers", "base game", "__proto__"])(
+        "does not find a variant for %o",
+        (slug) => {
+            expect(variantById(slug)).toBeUndefined();
+        },
+    );
 });

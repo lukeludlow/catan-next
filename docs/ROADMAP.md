@@ -522,7 +522,7 @@ Update the status column in place as phases land.
 | 2   | Randomness and settings                        | ✅     |
 | 3   | Generation pipeline                            | ✅     |
 | 4   | SVG rendering                                  | ✅     |
-| 5   | Routes and controls                            | ⬜     |
+| 5   | Routes and controls                            | ✅     |
 | 6   | CI and docs                                    | ⬜     |
 | 7   | Vercel deploy                                  | ⬜     |
 | —   | _milestone: parity with the old app, deployed_ |        |
@@ -660,6 +660,39 @@ share-link affordance.
 `npm run build` shows the board routes as dynamic — confirming the generator
 stayed on the server.
 
+**Landed.** `npm run build` reports `ƒ /[variant]`, and §10.3 passes — including
+the check that would have failed on the original: across 40 seeds at every
+islands setting, the landmasses counted **in the rendered HTML** equal the
+number in the URL, single-hex islands included (§4.7). Four decisions, three
+taken with the user before the work started:
+
+- **One `/[variant]` route rather than the two files listed above**, pulling
+  Phase 8's route shape forward. The URLs are unchanged, because the slugs are
+  the registry's own ids. There is deliberately **no `generateStaticParams`**:
+  the page reads `searchParams` and redirects at request time, so it is dynamic
+  by construction — which §10.4 requires — and an unknown slug is turned away by
+  an explicit `notFound()` instead.
+- **A URL that does not describe its board is redirected until it does.** A
+  missing seed, a clamped `?islands=99`, a repeated key and a tracking parameter
+  all resolve to one canonical address, so the share link is simply the address
+  bar. The redirect provably terminates because `canonicalParams` is a fixed
+  point of `isCanonical`, which is a unit test rather than an assumption.
+- **The islands slider keeps the seed; only Regenerate rolls a new one**, so the
+  same board can be compared at two island counts.
+- **The islands range is data on the registry** (`Variant.islands`), not a
+  constant in the control. A variant with no sea gets no slider, and Phase 10
+  raising the ceiling to 7 is a registry edit.
+
+Two deliverables beyond the list: `src/routing/boardUrl.ts` owns both directions
+of the query contract, which is what leaves the route file with nothing testable
+in it that is not already covered by the fast tier — the same split Phase 4 made
+for `hexLabel.ts`. And `not-found.tsx`, since a mistyped variant now reaches
+one. `ShareLink` reads the origin through `useSyncExternalStore` rather than an
+effect: it is the one hook with a _server_ snapshot, so the server renders the
+path, the client renders the full URL, and hydration is told to expect the
+difference — an effect that called `setState` is what
+`react-hooks/set-state-in-effect` rejects.
+
 ### Phase 6 — CI and docs
 
 `verify.sh` itself landed back in Phase 1.5; what is left is running it
@@ -712,13 +745,18 @@ suite immediately.
 
 Make the variant a first-class parameter rather than two hardcoded routes.
 
+**The route half of this phase landed in Phase 5** —
+`src/app/[variant]/page.tsx` already reads the variant from the registry and
+404s on an unknown slug, and the home page already lists `ALL_VARIANTS`, so both
+follow new entries without being touched. What is left here is the player count.
+
 Deliverables: the Phase 2 registry in `src/domain/variants.ts` extended to all
 four ids (`base-game`, `base-game-56`, `seafarers`, `seafarers-56`), each entry
-pairing a shape with its settings and a display name; routes reworked to
-`src/app/[variant]/page.tsx` with `generateStaticParams` over the registry; a
+pairing a shape with its settings, a display name and an islands range; a
 player-count control in `BoardControls.tsx` that switches between the 3–4 and
 5–6 entries of the current game and encodes it in the URL (`?players=6`), so a
-shared link carries the player count along with the seed.
+shared link carries the player count along with the seed — which means teaching
+`src/routing/boardUrl.ts` a third key, and its canonical form along with it.
 
 **Done when:** the two existing variants render through the registry with no
 behavior change, the URL round-trips variant + players + seed, and an unknown

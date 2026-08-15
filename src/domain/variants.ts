@@ -19,11 +19,21 @@ import type { MapSettings } from "@/domain/types";
 // these are kebab-case strings rather than an enum.
 export type VariantId = "base-game" | "seafarers";
 
+// What the islands control is allowed to ask this variant for, or `undefined`
+// when the variant has no sea and is therefore always one landmass. Data on the
+// registry rather than a constant inside the control, for the same reason the
+// shape and the settings are: Phase 10 expects to raise the ceiling to 7 for
+// the larger Seafarers frame, and a control that reads the range off the
+// variant needs no edit to follow. Whether a slider is drawn at all is
+// `variant.islands !== undefined`, never a comparison against an id.
+export type IslandRange = { min: number; max: number; default: number };
+
 export type Variant = {
     id: VariantId;
     name: string;
     shape: readonly Axial[];
     settings: MapSettings;
+    islands?: IslandRange;
 };
 
 export const VARIANTS: Readonly<Record<VariantId, Variant>> = {
@@ -38,7 +48,20 @@ export const VARIANTS: Readonly<Record<VariantId, Variant>> = {
         name: "Seafarers",
         shape: SEAFARERS_SHAPE,
         settings: SEAFARERS_SETTINGS,
+        // The original's slider, transcribed: floor 1, ceil 6, starting at 3
+        // (`_seafarers/seafarers.component.ts:17`). generate.test.ts already
+        // sweeps every value in that range at 60 seeds each, so the control
+        // cannot offer a setting the generator has not been proven to hit.
+        islands: { min: 1, max: 6, default: 3 },
     },
 };
 
 export const ALL_VARIANTS: readonly Variant[] = Object.values(VARIANTS);
+
+// Lookup by an untrusted string — a URL segment. A search rather than an index
+// with a cast, because `VARIANTS[slug as VariantId]` types the result as a
+// `Variant` that is really `undefined`, which is exactly the lie that would
+// send an unknown slug into the generator instead of into a 404.
+export function variantById(id: string): Variant | undefined {
+    return ALL_VARIANTS.find((variant) => variant.id === id);
+}
