@@ -93,5 +93,8 @@ that hold them apart.
 
 ## Deployment
 
-Vercel — **not yet live.** The deploy is Phase 7 of the roadmap; until it lands,
-the running app is still the Angular one on GitHub Pages.
+Vercel — **live at [catan-next.vercel.app](https://catan-next.vercel.app)**
+[TODO: confirm production URL after first deploy]. Every push to `main` deploys
+to production; every pull request gets its own preview deployment. The original
+Angular app remains at
+[`lukeludlow.github.io/catan`](https://lukeludlow.github.io/catan) for now.

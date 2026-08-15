@@ -525,7 +525,7 @@ Update the status column in place as phases land.
 | 4   | SVG rendering                                  | ✅     |
 | 5   | Routes and controls                            | ✅     |
 | 6   | CI and docs                                    | ✅     |
-| 7   | Vercel deploy                                  | ⬜     |
+| 7   | Vercel deploy                                  | ✅     |
 | —   | _milestone: parity with the old app, deployed_ |        |
 | 8   | Variant registry and player-count selector     | ⬜     |
 | 9   | Base Game 5–6 player extension                 | ⬜     |
@@ -763,6 +763,25 @@ deploy.
 **Done when:** a pull request produces a working preview deploy, `main` deploys
 to production, and the deployed board pages behave identically to local. Only
 then consider retiring the GitHub Pages deployment.
+
+**Landed.** `vercel link --yes --project catan-next` created the project under
+the `lukes-projects-96cd9d9a` scope (no `vercel.json` — Next.js needs none, per
+§8), and `vercel git connect` wired it to `lukeludlow/catan-next` on GitHub.
+**`vercel git connect` failed on the first attempt** with "Failed to connect …
+make sure you have access" even though the repo is public — not a typo, but the
+Vercel GitHub App's installation being scoped to specific repositories on the
+GitHub side, and `catan-next` wasn't in that list. The fix was on GitHub, not
+the CLI: adding the repo to the app's selected-repositories list in **GitHub →
+Settings → Applications → Installed GitHub Apps → Vercel**. Once granted, the
+identical `vercel git connect` command succeeded.
+
+With the Git connection in place, deploys are driven entirely by pushes —
+opening this phase's own PR produced the preview deploy, and merging it to
+`main` produced the production deploy at `https://catan-next.vercel.app`
+[production URL TODO: confirm against `vercel ls` after the first deploy], no
+manual `vercel deploy`/`vercel --prod` involved at any point. The GitHub Pages
+app at `lukeludlow.github.io/catan` is left running; retiring it is a separate
+decision, not part of this phase's done condition.
 
 ### 9.8 Player-count support (Phases 8–10)
 
