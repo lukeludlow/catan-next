@@ -1,0 +1,49 @@
+# The gate, run somewhere other than a laptop (docs/ROADMAP.md §8, Phase 6).
+#
+# Deliberately a thin wrapper: `./verify.sh` owns the list of stages, and this
+# file owns only the environment that script assumes. Splitting lint, test and
+# build into separate jobs here would copy that list into YAML, and the copy is
+# what drifts — the local gate and CI would then be two definitions of done.
+#
+# The one thing CI exercises that a local run never can is a cold start: a
+# clean `npm ci` and Playwright browsers installed from scratch.
+
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+# A superseded push has nothing worth finishing — the job is all-or-nothing.
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v7
+
+            # `node-version-file` rather than a literal 22: `.nvmrc` and
+            # `engines.node` already pin the version, and a third copy here is
+            # a third place to forget.
+            - uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - run: npm ci
+
+            # All three engines, because vitest.config.ts runs the browser tier
+            # against chromium, firefox and webkit. Uncached on purpose: the
+            # cold install is precisely what this workflow exists to prove.
+            - name: Install Playwright browsers
+              run: npx playwright install --with-deps
+
+            - run: ./verify.sh

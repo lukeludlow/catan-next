@@ -483,8 +483,9 @@ URL.
 ## 8. The gate, CI, and deployment
 
 **`verify.sh`** at the repo root, same `stage()` helper and fail-fast structure
-as the reference's, running: `eslint .` → `prettier --check .` → `tsc --noEmit`
-→ `vitest run --project unit` → `vitest run --project browser` → `next build`.
+as the reference's, running: `eslint .` → `prettier --check .` →
+`npm run typecheck` (`next typegen && tsc --noEmit`, see Phase 6) →
+`vitest run --project unit` → `vitest run --project browser` → `next build`.
 
 The gate and the CI that wraps it land at different times on purpose. Every
 stage above already works as of Phase 0, so **`verify.sh` lands in Phase 1.5**
@@ -523,7 +524,7 @@ Update the status column in place as phases land.
 | 3   | Generation pipeline                            | ✅     |
 | 4   | SVG rendering                                  | ✅     |
 | 5   | Routes and controls                            | ✅     |
-| 6   | CI and docs                                    | ⬜     |
+| 6   | CI and docs                                    | ✅     |
 | 7   | Vercel deploy                                  | ⬜     |
 | —   | _milestone: parity with the old app, deployed_ |        |
 | 8   | Variant registry and player-count selector     | ⬜     |
@@ -705,6 +706,54 @@ Deliverables: `.github/workflows/ci.yml`, `README.md`, and any
 first time `./verify.sh` runs from a clean `npm ci` and a cold
 `npx playwright install --with-deps`, the two things a local run never
 exercises.
+
+**Landed.** The workflow is one job and five steps, and four of them exist only
+to build the environment `verify.sh` assumes; splitting lint, test and build
+into separate jobs would have copied the stage list into YAML, and the copy is
+what drifts. Four decisions, plus a documentation split:
+
+- **`actions/checkout@v7` and `actions/setup-node@v7`**, not the `@v4` §8 names.
+  §8 was written when v4 was current; v7 is now the released major for both and
+  the v4 line runs on a deprecated action runtime. None of the inputs used here
+  changed across the bump.
+- **`node-version-file: .nvmrc`** rather than a literal `22`. The version is
+  already pinned twice (`.nvmrc`, `engines.node`); a third copy in CI would be a
+  third place to forget.
+- **Nothing is cached except npm.** No Playwright browser cache, no `.next/`
+  restore — the cold install is precisely what this workflow exists to prove,
+  and caching it away on day one would hide the failure mode it was written to
+  catch.
+- **`concurrency` with `cancel-in-progress`**, keyed on the ref. The gate is
+  all-or-nothing, so a superseded push has nothing worth finishing.
+
+**The first run went red, and it was right to.** `verify.sh` had passed on this
+laptop for five phases while being unrunnable on a clean checkout: `PageProps`
+and `LayoutProps` are globals Next generates into `.next/types/`, which
+`tsconfig.json` includes, so any machine that has ever run `next dev` has them
+and never learns that `tsc --noEmit` alone is not a complete typecheck. CI has
+no `.next/`, and the typecheck stage failed in ten seconds with three
+`TS2304: Cannot find name 'PageProps'`.
+
+The fix is one word in `package.json` — `typecheck` is now
+`next typegen && tsc --noEmit` — plus `verify.sh` calling `npm run typecheck`
+rather than restating the command, so the script and the manifest cannot
+disagree about what typechecking includes. **This is the entire justification
+for the phase**: the gate was measuring the machine it ran on, and nothing local
+could have revealed that. The stage order is unchanged — typecheck still runs
+before the tests, and `next build` is still last.
+
+The docs now answer questions at three depths, which is what "any
+`docs/ARCHITECTURE.md` detail that outgrew this file" turned out to mean:
+`README.md` (what this is, how to run it) → `docs/ARCHITECTURE.md` (how the code
+is organized and what enforces the boundaries) → `docs/GENERATION.md` (how a
+seed becomes a board). **This file stays the history** — organized by when
+rather than by what — and the other three link to it rather than restate it. The
+`create-next-app` boilerplate README is deleted outright, including its
+yarn/pnpm/bun instructions for tools §1 records as absent from this machine.
+
+One process note for Phase 7: `gh` is not installed here, so the pull request
+was opened by hand from the URL `git push` prints, and the run was watched
+through the public Actions API rather than `gh run watch`.
 
 ### Phase 7 — Vercel deploy
 
