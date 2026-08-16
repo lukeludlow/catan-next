@@ -527,8 +527,8 @@ Update the status column in place as phases land.
 | 6   | CI and docs                                    | ✅     |
 | 7   | Vercel deploy                                  | ✅     |
 | —   | _milestone: parity with the old app, deployed_ |        |
-| 8   | Variant registry and player-count selector     | ⬜     |
-| 9   | Base Game 5–6 player extension                 | ⬜     |
+| 8   | Variant registry and player-count selector     | ✅     |
+| 9   | Base Game 5–6 player extension                 | ✅     |
 | 10  | Seafarers 5–6 player                           | ⬜     |
 
 Phases 0–7 reach parity with the deployed Angular app. Phases 8–10 are new
@@ -881,6 +881,50 @@ shared link carries the player count along with the seed — which means teachin
 behavior change, the URL round-trips variant + players + seed, and an unknown
 variant slug returns a 404 rather than throwing.
 
+**Landed.** The sketch above asks for two things that turn out to contradict
+each other: four registry ids, and the player count in the query. Both cannot be
+the route slug, and `Variant.id` had been doing that job since Phase 5. So the
+phase's real content was **splitting the two ideas apart** — a _game_ is what
+the URL names, a _variant_ is one game at one player count — and everything else
+followed from that. Five decisions:
+
+- **`Game.variants` is a list, not a `Record<PlayerCount, Variant>`.** Seafarers
+  has no 5–6 player entry until Phase 10, and a record would have needed a hole
+  in it. The list is also what the new control keys off:
+  `game.variants.length > 1` draws the toggle, exactly as
+  `variant.islands !== undefined` draws the slider. No control compares against
+  an id, so Phase 10 is a registry edit here too. A `Game` carries **no display
+  name**, because nothing renders a game — the card, the `<h1>` and the title
+  all name a variant.
+- **`players` is emitted unconditionally**, even for a game that offers one
+  count and even at its default. `islands` is conditional because a board
+  without sea has no island count to state; every board is for _some_ number of
+  players, so every canonical address says which. It also keeps `queryEntries` —
+  the single list `boardHref` and `isCanonical` share, and therefore the
+  redirect's termination proof — free of a second conditional.
+- **`boardUrl.ts` takes a `Game` rather than a `Variant`.** Which variant a URL
+  means is now something that module _decides_, and it must decide it first:
+  `islands` clamps against the resolved variant's range, which Phase 10 will
+  make differ by player count. Reading `players` before `islands` is a real
+  ordering dependency and is commented as one.
+- **The home page lists variants, not games** — a decision taken with the user
+  against the two-card alternative. The 5–6 player board is a board someone came
+  here to generate; behind a control on another page it would be the only one
+  you cannot send a friend a link to from the front door. The card is a deep
+  link that already spells out `?players=`, so both routes to it end at the same
+  address. This is why `Variant` carries a `game` back-reference.
+- **`go()` now also refuses to push the address already on screen.** The Phase 5
+  guard only remembered what it had pushed, which was enough for a slider that
+  cannot commit an unchanged value. A radio group makes "select the option
+  already selected" one tap away, and that would have been a history entry going
+  nowhere.
+
+Old links redirect exactly once to pick up `players`, which is the same
+mechanism a bare `/seafarers` already went through. `src/app/[variant]/` is now
+`src/app/[game]/`; note that `next typegen` writes a route validator into
+`.next/`, so a stale one has to be cleared after renaming a segment or the
+typecheck stage fails on a route file that no longer exists.
+
 #### Phase 9 — Base Game 5–6 player extension
 
 The physical 5–6 player extension board is **30 land hexes**, laid out in rows
@@ -903,6 +947,38 @@ automated can catch a wrong port count — it has to be read off the components.
 **Done when:** the board renders 30 hexes with 2 deserts and 28 chits, no
 adjacent 6/8, and the registry test from §9.8 passes for the new entry without
 any change to the generator modules.
+
+**Landed, and §9.8 held.** Adding the variant was three data edits —
+`BASE_GAME_56_SHAPE`, `BASE_GAME_56_SETTINGS`, one registry entry — and
+`terrain.ts`, `numbers.ts`, `ports.ts` and `validate.ts` were not opened. The
+first test run after registering it failed **one** assertion, the literal list
+of registry ids; every invariant that matters (chit pool, fillability, port
+capacity, and `generate.test.ts`'s full 200-seed sweep) passed for a board it
+had never seen. That is the whole return on building the registry in Phase 2.
+
+- **The shape is described, not transcribed.** With no original to port from,
+  there is no characterization table to pin it against, so it is written as a
+  closed form instead: the cube-bounded hexagon `q ∈ [-3,2]`, `r ∈ [-3,3]`,
+  `s ∈ [-2,3]` — a semi-regular hexagon with sides alternating 3 and 4, which is
+  what 3-4-5-6-5-4-3 is. `shapes.test.ts` checks those bounds in both
+  directions, checks the row lengths, and checks that the radius-2 board sits
+  inside this frame, since the extension adds tiles rather than replacing them.
+- **The 28-chit bag is shared with Seafarers** as this section suggested, as a
+  named `EXTENSION_DICE_NUMBERS`. `settings.test.ts` still pins each variant's
+  bag against its own literal, so sharing the object cannot let one drift.
+- **The harbour mix was not verified against the box** — recorded in §11. It is
+  the 3–4 player board's nine with both extra harbours assumed generic: `any: 6`
+  plus one each of the five resources. This section is right that nothing
+  automated can catch it being wrong.
+- **It is the most expensive board in the app**, at 4.33 ms against the 3–4
+  player game's 0.42, with no failures in 5,000. 28 numbered hexes out of 30
+  with three of every middle number is the densest deal here. Relaxing
+  `maxVertexPips` takes it to 1.86 ms, so a little over half the cost is the pip
+  cap; uncapped, 57.4% of its boards carry a 13-pip vertex against 44.7% for the
+  small board. The cap **stays at 12** — four milliseconds on a request that
+  renders one board is not worth trading a balance rule for. `GENERATION.md` has
+  the table, and this partly answers ahead of time the question Phase 10 asks
+  about whether the pip cap outgrows its usefulness on a bigger frame.
 
 #### Phase 10 — Seafarers 5–6 player
 
@@ -986,6 +1062,14 @@ Recorded so a future reader does not "fix" them by accident:
 - **Terrain counts vary run to run.** The remainder bag is larger than the
   number of slots left to fill, so leftovers go unplaced — this is what makes
   sea and gold counts differ between boards, and it is intentional.
+- **The Base Game 5–6 player harbour mix is assumed, not transcribed.** Its 30
+  tiles and 28 chits were read off the physical extension; its eleven harbours
+  were not. `BASE_GAME_56_SETTINGS.ports` is the 3–4 player board's nine with
+  both of the extension's extra harbours taken to be generic — `any: 6` plus one
+  2:1 per resource. Every other number in that object is checkable by a test;
+  this one is only checkable against the box. If someone with the components to
+  hand finds it wrong, correcting it is a one-line edit and a one-line test
+  change, and nothing else in the generator cares.
 
 Not carried forward, and equally deliberate: the three balance rules of §4.9 are
 **new**, so a board from this app will not look like one from

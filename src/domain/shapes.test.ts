@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { distance, key, neighborCoords, neighbors } from "@/domain/hex";
 import type { Axial } from "@/domain/hex";
-import { BASE_GAME_SHAPE, SEAFARERS_SHAPE } from "@/domain/shapes";
+import {
+    BASE_GAME_56_SHAPE,
+    BASE_GAME_SHAPE,
+    SEAFARERS_SHAPE,
+} from "@/domain/shapes";
 
 // The original's 13-row jagged Seafarers board, written out as the axial
 // coordinates its own `convertHexCoordsToHexBlobCube` produced for each
@@ -43,6 +47,7 @@ function sortedKeys(coords: readonly Axial[]): string[] {
 
 const VARIANTS = [
     { name: "base game", shape: BASE_GAME_SHAPE, hexCount: 19 },
+    { name: "base game 5-6", shape: BASE_GAME_56_SHAPE, hexCount: 30 },
     { name: "seafarers", shape: SEAFARERS_SHAPE, hexCount: 42 },
 ] as const;
 
@@ -118,6 +123,71 @@ describe("base game shape", () => {
                 expect(hexes.has(key({ q, r }))).toBe(true);
             }
         }
+    });
+});
+
+// The 5-6 player extension board. Nothing in the Angular original describes it
+// (ROADMAP §9.8), so there is no characterization table to pin it against the
+// way the Seafarers shape is pinned below — these assertions have to stand in
+// for one, by checking the closed-form description in shapes.ts rather than
+// restating the row ranges it was written from.
+describe("base game 5-6 shape", () => {
+    // The 3-4-5-6-5-4-3 of the physical board, which is the one fact about it
+    // anyone can check by looking at the box.
+    test("has rows of 3-4-5-6-5-4-3", () => {
+        const lengths = new Map<number, number>();
+
+        for (const { r } of BASE_GAME_56_SHAPE) {
+            lengths.set(r, (lengths.get(r) ?? 0) + 1);
+        }
+
+        expect(
+            [...lengths.entries()]
+                .sort(([a], [b]) => a - b)
+                .map(([, length]) => length),
+        ).toEqual([3, 4, 5, 6, 5, 4, 3]);
+    });
+
+    // A semi-regular hexagon with sides alternating 3 and 4: three cube bounds,
+    // two of width 6 and one of width 7. Both directions, so neither a stray
+    // coordinate nor a missing one can hide.
+    test("is the cube-bounded hexagon shapes.ts claims", () => {
+        const withinBounds = ({ q, r }: Axial): boolean =>
+            q >= -3 &&
+            q <= 2 &&
+            r >= -3 &&
+            r <= 3 &&
+            -q - r >= -2 &&
+            -q - r <= 3;
+
+        for (const coord of BASE_GAME_56_SHAPE) {
+            expect(withinBounds(coord)).toBe(true);
+        }
+
+        const hexes = mapOf(BASE_GAME_56_SHAPE);
+
+        for (let q = -3; q <= 2; q++) {
+            for (let r = -3; r <= 3; r++) {
+                if (!withinBounds({ q, r })) {
+                    continue;
+                }
+                expect(hexes.has(key({ q, r }))).toBe(true);
+            }
+        }
+    });
+
+    // The extension adds tiles to the standard board rather than replacing it,
+    // so the radius-2 hexagon has to sit inside this frame. Not arithmetic
+    // either shape states about itself — it is only true because the two row
+    // tables were written to the same origin.
+    test("contains the 3-4 player board it extends", () => {
+        const hexes = mapOf(BASE_GAME_56_SHAPE);
+
+        for (const coord of BASE_GAME_SHAPE) {
+            expect(hexes.has(key(coord))).toBe(true);
+        }
+
+        expect(BASE_GAME_56_SHAPE).toHaveLength(BASE_GAME_SHAPE.length + 11);
     });
 });
 

@@ -65,7 +65,11 @@ export default function BoardControls({
     function go(next: BoardParams): void {
         const href = boardHref(game, next);
 
-        if (href === pushed) {
+        // Never push the address already in the bar. `pushed` covers the window
+        // between a push and the server's answer; `current` covers a control
+        // that was operated without changing anything — selecting the player
+        // count already selected, which a radio group makes one tap away.
+        if (href === pushed || href === current) {
             return;
         }
 
@@ -93,7 +97,10 @@ export default function BoardControls({
                 <div
                     role="radiogroup"
                     aria-label="players"
-                    className="flex shrink-0 rounded-full border border-black/15 p-1 dark:border-white/20"
+                    // `self-start` so the pill hugs its two options when the
+                    // row stacks on a phone, rather than stretching to the
+                    // column width with both buttons bunched at one end.
+                    className="flex shrink-0 self-start rounded-full border border-black/15 p-1 sm:self-auto dark:border-white/20"
                 >
                     {game.variants.map((option) => {
                         const selected = option.players === params.players;

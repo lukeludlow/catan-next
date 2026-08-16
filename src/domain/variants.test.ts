@@ -199,6 +199,7 @@ describe("the registry", () => {
     test("holds every variant", () => {
         expect(Object.keys(VARIANTS).sort()).toEqual([
             "base-game",
+            "base-game-56",
             "seafarers",
         ]);
     });
@@ -219,6 +220,7 @@ describe("the registry", () => {
     // shape came from different boards would pass every test above.
     test("pairs each variant with a board of the expected size", () => {
         expect(VARIANTS["base-game"].shape).toHaveLength(19);
+        expect(VARIANTS["base-game-56"].shape).toHaveLength(30);
         expect(VARIANTS.seafarers.shape).toHaveLength(42);
     });
 

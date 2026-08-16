@@ -58,6 +58,48 @@ export const BASE_GAME_SETTINGS: MapSettings = {
     ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 4 },
 };
 
+// 28 chits: 2x2, 3-6 x3, 8-11 x3, 12x2. Seafarers and the Base Game 5-6 player
+// extension ship the same bag, which is a coincidence of the two boxes rather
+// than a rule — but it is a coincidence worth naming once instead of typing
+// twice. settings.test.ts still pins each variant's bag against its own
+// literal, so sharing the object cannot let one drift unnoticed.
+const EXTENSION_DICE_NUMBERS: MapSettings["diceNumbers"] = {
+    2: 2,
+    3: 3,
+    4: 3,
+    5: 3,
+    6: 3,
+    8: 3,
+    9: 3,
+    10: 3,
+    11: 3,
+    12: 2,
+};
+
+// The 5-6 player extension (ROADMAP §9 Phase 9). Exact counts summing to 30,
+// like the 3-4 player board and unlike Seafarers: 28 resource hexes against a
+// 28-chit pool, again with nothing spare.
+//
+// ROADMAP §11: the tile and chit counts are read off the physical components,
+// but the 11-harbour mix is *not* verified against the box — it is the 3-4
+// player board's nine with the extension's two extra harbours assumed generic.
+// Nothing automated can catch a wrong port count, so it is flagged rather than
+// presented as transcribed.
+export const BASE_GAME_56_SETTINGS: MapSettings = {
+    terrainCounts: {
+        brick: { min: 5, max: 5 },
+        desert: { min: 2, max: 2 },
+        gold: { min: 0, max: 0 },
+        rock: { min: 5, max: 5 },
+        sea: { min: 0, max: 0 },
+        sheep: { min: 6, max: 6 },
+        tree: { min: 6, max: 6 },
+        wheat: { min: 6, max: 6 },
+    },
+    diceNumbers: EXTENSION_DICE_NUMBERS,
+    ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 6 },
+};
+
 export const SEAFARERS_SETTINGS: MapSettings = {
     terrainCounts: {
         brick: { min: 2, max: 5 },
@@ -76,17 +118,6 @@ export const SEAFARERS_SETTINGS: MapSettings = {
         tree: { min: 2, max: 5 },
         wheat: { min: 2, max: 5 },
     },
-    diceNumbers: {
-        2: 2,
-        3: 3,
-        4: 3,
-        5: 3,
-        6: 3,
-        8: 3,
-        9: 3,
-        10: 3,
-        11: 3,
-        12: 2,
-    },
+    diceNumbers: EXTENSION_DICE_NUMBERS,
     ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 5 },
 };

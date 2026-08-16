@@ -1,21 +1,24 @@
 # catan-next
 
-A Catan board generator — Base Game and Seafarers — built with Next.js, React
-and inline SVG. It is a port of the Angular 9 app archived at
-[`lukeludlow/catan`](https://github.com/lukeludlow/catan), rewritten around
-axial hex coordinates rather than transliterated.
+A Catan board generator — Base Game, the 5–6 player extension, and Seafarers —
+built with Next.js, React and inline SVG. It is a port of the Angular 9 app
+archived at [`lukeludlow/catan`](https://github.com/lukeludlow/catan), rewritten
+around axial hex coordinates rather than transliterated.
 
 **The URL is the board.** Every board is a pure function of
-`(variant, seed, islands)`, and all three live in the address bar:
+`(game, players, seed, islands)`, and all four live in the address bar:
 
 ```
-/seafarers?seed=k3f9qz&islands=4
+/seafarers?seed=k3f9qz&players=4&islands=4
+/base-game?seed=k3f9qz&players=6
 ```
 
-That link renders the same 42 hexes, the same chits and the same harbours on
-every reload, on every device, for every person you send it to. The original
-could not offer that — it called `Math.random()` from inside four services and
-kept the board only as DOM it had already thrown away.
+Those links render the same hexes, the same chits and the same harbours on every
+reload, on every device, for every person you send them to. The original could
+not offer that — it called `Math.random()` from inside four services and kept
+the board only as DOM it had already thrown away. It also had no 5–6 player
+support at all; that is new here, and it is a registry entry rather than a code
+path.
 
 ## Quick start
 

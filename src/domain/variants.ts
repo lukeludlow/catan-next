@@ -18,8 +18,16 @@
 // seed.
 
 import type { Axial } from "@/domain/hex";
-import { BASE_GAME_SETTINGS, SEAFARERS_SETTINGS } from "@/domain/settings";
-import { BASE_GAME_SHAPE, SEAFARERS_SHAPE } from "@/domain/shapes";
+import {
+    BASE_GAME_56_SETTINGS,
+    BASE_GAME_SETTINGS,
+    SEAFARERS_SETTINGS,
+} from "@/domain/settings";
+import {
+    BASE_GAME_56_SHAPE,
+    BASE_GAME_SHAPE,
+    SEAFARERS_SHAPE,
+} from "@/domain/shapes";
 import type { MapSettings } from "@/domain/types";
 
 // The URL segment, which is why these are kebab-case strings rather than an
@@ -27,7 +35,7 @@ import type { MapSettings } from "@/domain/types";
 // heading, the title and the home page card all name a *variant*.
 export type GameId = "base-game" | "seafarers";
 
-export type VariantId = "base-game" | "seafarers";
+export type VariantId = "base-game" | "base-game-56" | "seafarers";
 
 // 4 means the 3-4 player board, 6 the 5-6 player extension. The physical boxes
 // are labelled by their upper bound, and so is `?players=`.
@@ -80,6 +88,14 @@ export const VARIANTS: Readonly<Record<VariantId, Variant>> = {
         shape: BASE_GAME_SHAPE,
         settings: BASE_GAME_SETTINGS,
     },
+    "base-game-56": {
+        id: "base-game-56",
+        name: "Base Game Extension",
+        game: "base-game",
+        players: 6,
+        shape: BASE_GAME_56_SHAPE,
+        settings: BASE_GAME_56_SETTINGS,
+    },
     seafarers: {
         id: "seafarers",
         name: "Seafarers",
@@ -100,7 +116,7 @@ export const ALL_VARIANTS: readonly Variant[] = Object.values(VARIANTS);
 export const GAMES: Readonly<Record<GameId, Game>> = {
     "base-game": {
         id: "base-game",
-        variants: [VARIANTS["base-game"]],
+        variants: [VARIANTS["base-game"], VARIANTS["base-game-56"]],
     },
     seafarers: {
         id: "seafarers",

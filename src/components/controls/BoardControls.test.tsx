@@ -98,6 +98,58 @@ describe("BoardControls", () => {
         },
     );
 
+    test("offers one option per board the game has", async () => {
+        const screen = await render(
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+        );
+
+        await expect
+            .element(screen.getByRole("radio", { name: "3–4" }))
+            .toHaveAttribute("aria-checked", "true");
+        await expect
+            .element(screen.getByRole("radio", { name: "5–6" }))
+            .toHaveAttribute("aria-checked", "false");
+    });
+
+    // The point of the phase: the player count travels in the address, so a
+    // shared link is a link to a specific board and not just to a game.
+    test("pushes the player count when the toggle is used", async () => {
+        const screen = await render(
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+        );
+
+        await screen.getByRole("radio", { name: "5–6" }).click();
+
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(pushed().path).toBe("/base-game");
+        expect(pushed().params.players).toBe(6);
+    });
+
+    // The same decision the islands slider makes: only regenerate rolls a new
+    // seed, so the same board can be compared at two player counts.
+    test("keeps the seed when the player count changes", async () => {
+        const screen = await render(
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+        );
+
+        await screen.getByRole("radio", { name: "5–6" }).click();
+
+        expect(pushed().params.seed).toBe("abc123");
+    });
+
+    // Selecting the count already on screen would push the address already in
+    // the bar — a history entry that goes nowhere, the same thing the `pushed`
+    // guard exists to prevent for the slider.
+    test("does not navigate when the current count is reselected", async () => {
+        const screen = await render(
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+        );
+
+        await screen.getByRole("radio", { name: "3–4" }).click();
+
+        expect(push).not.toHaveBeenCalled();
+    });
+
     test("offers the islands slider the registry's bounds", async () => {
         const range = SEAFARERS.variants[0].islands;
         const { container } = await render(

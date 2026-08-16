@@ -105,11 +105,11 @@ What changed is where the land goes:
 5. **Stop at `L`**, deal the resource terrains across all the land at once, and
    pour sea and desert into everything left over.
 
-Boards with no island constraint — the Base Game, which has no sea and so is
-always one landmass — skip growth entirely and scatter the bag as §5 wrote it.
-Growing a single island over 18 of 19 hexes would leave the desert wherever the
-growth failed to reach, which is reliably the perimeter. That is a board-
-character regression for no gain, so the branch stays.
+Boards with no island constraint — both Base Game boards, which have no sea and
+so are always one landmass — skip growth entirely and scatter the bag as §5
+wrote it. Growing a single island over 18 of 19 hexes would leave the desert
+wherever the growth failed to reach, which is reliably the perimeter. That is a
+board-character regression for no gain, so the branch stays.
 
 ## Seating the red numbers
 
@@ -155,9 +155,10 @@ nothing, because the grower enforces it while building rather than by rejection.
 
 `maxVertexPips` is measured over `vertexTriples` in `hex.ts`: every place three
 hexes meet, which is where a settlement goes. A 6 or 8 is worth 5 pips, a 2 or
-12 one. Seafarers has 62 such vertices and the Base Game 24. Left unbounded,
-guided boards put a 13-pip vertex on 34% of Seafarers boards and 54% of Base
-Game boards.
+12 one. Seafarers has 62 such vertices, the Base Game 24, and its 5–6 player
+extension 42. Left unbounded, guided boards put a 13-pip vertex on 34% of
+Seafarers boards and 54% of Base Game boards — see "Measured cost" below for
+what the cap costs on the extension board, which is where it bites hardest.
 
 The last two are the only rules still enforced by resampling — they depend on
 the whole deal, so there is nothing to construct them from. Together they cost
@@ -219,6 +220,7 @@ shared `Rng`, default options.
 | Configuration     | Boards | Failures | ms/board |
 | ----------------- | ------ | -------- | -------- |
 | Base Game         | 5,000  | 0        | 0.42     |
+| Base Game 5–6     | 5,000  | 0        | 4.33     |
 | Seafarers, 1 isle | 5,000  | 0        | 1.47     |
 | Seafarers, 2      | 5,000  | 0        | 0.92     |
 | Seafarers, 3      | 5,000  | 0        | 0.73     |
@@ -226,10 +228,30 @@ shared `Rng`, default options.
 | Seafarers, 5      | 5,000  | 0        | 0.53     |
 | Seafarers, 6      | 5,000  | 0        | 0.55     |
 
-35,000 boards, no failures. One island is the _slowest_ setting, not the
-fastest: a single landmass concentrates the chits, so the pip cap and the
+40,000 boards, no failures. One island is the _slowest_ Seafarers setting, not
+the fastest: a single landmass concentrates the chits, so the pip cap and the
 adjacent-numbers rule both bite harder and it takes more re-deals. Compare the
 ~2,000 attempts and ~40 ms that six islands cost under rejection sampling.
+
+**The Base Game 5–6 player board is the most expensive in the app**, at ten
+times its 3–4 player counterpart, and Phase 9 measured why rather than leaving
+it as a surprise. It is 28 numbered hexes out of 30 with three of every middle
+number — the densest deal here, and the one with the least room to satisfy a
+rule. Relaxing `maxVertexPips` to infinity takes it from 4.33 ms to 1.86, so a
+little over half the cost is the pip cap and the rest is board size and
+`noAdjacentEqualNumbers`. Left uncapped, **57.4% of its boards carry a 13-pip
+vertex**, against 44.7% for the 3–4 player board over the same run:
+
+| Configuration | Vertices | 13-pip vertex, uncapped | ms/board capped | uncapped |
+| ------------- | -------- | ----------------------- | --------------- | -------- |
+| Base Game     | 24       | 44.7%                   | 0.42            | 0.26     |
+| Base Game 5–6 | 42       | 57.4%                   | 4.33            | 1.86     |
+
+The cap stays at 12. Four milliseconds on a request that renders one board is
+not a cost worth trading a balance rule for, and the retry loop absorbs it with
+no failures in 5,000 — the 200-deal ceiling per layout is nowhere near reached.
+This is also a partial answer to the question Phase 10 is asked below: the pip
+cap does reject more on a bigger board, and it is still affordable.
 
 Terrain growth alone, single attempt, 3,000 layouts per setting:
 
