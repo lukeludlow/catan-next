@@ -1,12 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { mulberry32 } from "@/domain/rng";
-import { ALL_VARIANTS, VARIANTS } from "@/domain/variants";
-import type { Variant } from "@/domain/variants";
+import { ALL_GAMES, GAMES, variantFor } from "@/domain/variants";
+import type { Game } from "@/domain/variants";
 import {
     boardHref,
     canonicalParams,
     isCanonical,
+    paramsForPlayers,
     parseParams,
+    playersFromQuery,
     randomSeed,
 } from "@/routing/boardUrl";
 import type { BoardParams, Query } from "@/routing/boardUrl";
@@ -15,8 +17,8 @@ import type { BoardParams, Query } from "@/routing/boardUrl";
 // that stand in for the route file itself: a server component cannot be
 // rendered in either tier, but every decision it makes lives here.
 
-const SEAFARERS = VARIANTS.seafarers;
-const BASE_GAME = VARIANTS["base-game"];
+const SEAFARERS = GAMES.seafarers;
+const BASE_GAME = GAMES["base-game"];
 
 // Reads a built href back the way Next hands one to a page, which is what
 // makes the round-trip below a statement about real URLs rather than about two
@@ -98,6 +100,60 @@ describe("parseParams", () => {
             parseParams({ islands: "4" }, BASE_GAME).islands,
         ).toBeUndefined();
     });
+
+    // The player half of the contract. `parseParams` reports a count only when
+    // the address really names one this game offers, so the redirect can tell a
+    // link that is already explicit from one it has to complete.
+    test.each(["", "six", "5", "99", "-6"])(
+        "does not report an unusable ?players=%s",
+        (raw) => {
+            expect(
+                parseParams({ players: raw }, SEAFARERS).players,
+            ).toBeUndefined();
+        },
+    );
+
+    test("does not report a player count this game does not offer", () => {
+        const offered = SEAFARERS.variants.map((variant) => variant.players);
+        const missing = ([4, 6] as const).find(
+            (players) => !offered.includes(players),
+        );
+
+        // Guard rather than skip: once Phase 10 gives Seafarers a 5-6 player
+        // entry this test has nothing left to say, and should be deleted rather
+        // than silently passing on an empty case.
+        expect(missing).toBeDefined();
+        expect(
+            parseParams({ players: String(missing) }, SEAFARERS).players,
+        ).toBeUndefined();
+    });
+
+    test.each(ALL_GAMES)("$id: reports the counts it offers", (game: Game) => {
+        for (const variant of game.variants) {
+            expect(
+                parseParams({ players: String(variant.players) }, game).players,
+            ).toBe(variant.players);
+        }
+    });
+});
+
+describe("playersFromQuery", () => {
+    test("falls back to the game's default board", () => {
+        expect(playersFromQuery({}, SEAFARERS)).toBe(
+            SEAFARERS.variants[0].players,
+        );
+        expect(playersFromQuery({ players: "nonsense" }, SEAFARERS)).toBe(
+            SEAFARERS.variants[0].players,
+        );
+    });
+
+    test.each(ALL_GAMES)("$id: reads a count it offers", (game: Game) => {
+        for (const variant of game.variants) {
+            expect(
+                playersFromQuery({ players: String(variant.players) }, game),
+            ).toBe(variant.players);
+        }
+    });
 });
 
 describe("canonicalParams", () => {
@@ -113,83 +169,155 @@ describe("canonicalParams", () => {
         );
     });
 
+    test("always states a player count", () => {
+        expect(canonicalParams({}, SEAFARERS).players).toBe(
+            SEAFARERS.variants[0].players,
+        );
+        expect(canonicalParams({}, BASE_GAME).players).toBe(
+            BASE_GAME.variants[0].players,
+        );
+    });
+
     test("falls back to the variant's default island count", () => {
         expect(canonicalParams({}, SEAFARERS).islands).toBe(
-            SEAFARERS.islands?.default,
+            variantFor(SEAFARERS, 4).islands?.default,
         );
     });
 
     test("leaves islands off a variant that declares no range", () => {
         expect(canonicalParams({ islands: "4" }, BASE_GAME)).toEqual({
             seed: expect.any(String),
+            players: 4,
         });
     });
 });
 
+describe("paramsForPlayers", () => {
+    test.each(ALL_GAMES)(
+        "$id: keeps the seed and re-derives islands",
+        (game: Game) => {
+            const from: BoardParams = canonicalParams(
+                { seed: "abc123" },
+                game,
+                mulberry32(1),
+            );
+
+            for (const variant of game.variants) {
+                const next = paramsForPlayers(game, from, variant.players);
+
+                expect(next.seed).toBe("abc123");
+                expect(next.players).toBe(variant.players);
+
+                // The islands key follows the *target* variant, not the one it
+                // came from: a range that does not exist there drops the key,
+                // and a narrower one clamps into it.
+                if (variant.islands === undefined) {
+                    expect(next.islands).toBeUndefined();
+                } else {
+                    expect(next.islands).toBeGreaterThanOrEqual(
+                        variant.islands.min,
+                    );
+                    expect(next.islands).toBeLessThanOrEqual(
+                        variant.islands.max,
+                    );
+                }
+            }
+        },
+    );
+
+    test("is what the control pushes, so the address needs no redirect", () => {
+        const from = canonicalParams({ seed: "abc123" }, SEAFARERS);
+        const next = paramsForPlayers(SEAFARERS, from, 4);
+
+        expect(
+            isCanonical(queryOf(boardHref(SEAFARERS, next)), SEAFARERS, next),
+        ).toBe(true);
+    });
+});
+
 describe("boardHref", () => {
-    test("addresses the variant by its own id", () => {
-        expect(boardHref(SEAFARERS, { seed: "abc123", islands: 3 })).toBe(
-            "/seafarers?seed=abc123&islands=3",
-        );
+    test("addresses the game by its own id, and states the players", () => {
+        expect(
+            boardHref(SEAFARERS, { seed: "abc123", players: 4, islands: 3 }),
+        ).toBe("/seafarers?seed=abc123&players=4&islands=3");
     });
 
     test("omits islands for a variant that declares no range", () => {
-        expect(boardHref(BASE_GAME, { seed: "abc123", islands: 3 })).toBe(
-            "/base-game?seed=abc123",
-        );
+        expect(
+            boardHref(BASE_GAME, { seed: "abc123", players: 4, islands: 3 }),
+        ).toBe("/base-game?seed=abc123&players=4");
     });
 
     test("escapes a seed that would otherwise break the query", () => {
-        const href = boardHref(SEAFARERS, { seed: "a&b=c d", islands: 3 });
+        const href = boardHref(SEAFARERS, {
+            seed: "a&b=c d",
+            players: 4,
+            islands: 3,
+        });
 
         expect(href).not.toContain("a&b=c d");
         expect(queryOf(href).seed).toBe("a&b=c d");
     });
 });
 
-// The two properties the route depends on, table-driven so a variant added in
-// Phases 9-10 is covered the day it is added (ROADMAP §9.8).
-describe.each(ALL_VARIANTS)("$name: the round trip", (variant: Variant) => {
-    const params: BoardParams = canonicalParams(
-        { seed: "abc123" },
-        variant,
-        mulberry32(1),
+// The two properties the route depends on, table-driven over every board the
+// registry offers so a variant added in Phases 9-10 is covered the day it is
+// added (ROADMAP §9.8).
+const BOARDS = ALL_GAMES.flatMap((game) =>
+    game.variants.map((variant) => ({ game, variant, name: variant.name })),
+);
+
+describe.each(BOARDS)("$name: the round trip", ({ game, variant }) => {
+    const params: BoardParams = paramsForPlayers(
+        game,
+        canonicalParams({ seed: "abc123" }, game, mulberry32(1)),
+        variant.players,
     );
 
     test("reads back exactly what it wrote", () => {
-        expect(
-            parseParams(queryOf(boardHref(variant, params)), variant),
-        ).toEqual(params);
+        expect(parseParams(queryOf(boardHref(game, params)), game)).toEqual(
+            params,
+        );
     });
 
     // Why the redirect cannot loop: the address a canonical URL redirects to
     // is itself.
     test("recognizes its own href as canonical", () => {
         expect(
-            isCanonical(queryOf(boardHref(variant, params)), variant, params),
+            isCanonical(queryOf(boardHref(game, params)), game, params),
         ).toBe(true);
     });
 
     test("canonicalizing a canonical query changes nothing", () => {
-        const query = queryOf(boardHref(variant, params));
+        const query = queryOf(boardHref(game, params));
 
-        expect(canonicalParams(query, variant, mulberry32(99))).toEqual(params);
+        expect(canonicalParams(query, game, mulberry32(99))).toEqual(params);
     });
 });
 
 describe("isCanonical", () => {
-    const params: BoardParams = { seed: "abc123", islands: 3 };
+    const params: BoardParams = { seed: "abc123", players: 4, islands: 3 };
 
     test("rejects a bare address, so a seedless visit gets one", () => {
         expect(isCanonical({}, SEAFARERS, params)).toBe(false);
     });
 
     test("rejects an address missing the islands it rendered", () => {
-        expect(isCanonical({ seed: "abc123" }, SEAFARERS, params)).toBe(false);
+        expect(
+            isCanonical({ seed: "abc123", players: "4" }, SEAFARERS, params),
+        ).toBe(false);
+    });
+
+    // The Phase 5 link shape. It still resolves to a board; it just is not the
+    // address that board now lives at.
+    test("rejects an address predating the players key", () => {
+        expect(
+            isCanonical({ seed: "abc123", islands: "3" }, SEAFARERS, params),
+        ).toBe(false);
     });
 
     test("rejects an address whose islands value was clamped", () => {
-        const query = { seed: "abc123", islands: "99" };
+        const query = { seed: "abc123", players: "4", islands: "99" };
         const canonical = canonicalParams(query, SEAFARERS);
 
         expect(canonical.islands).toBe(6);
@@ -199,7 +327,12 @@ describe("isCanonical", () => {
     test("rejects an address carrying a key the board does not read", () => {
         expect(
             isCanonical(
-                { seed: "abc123", islands: "3", ref: "twitter" },
+                {
+                    seed: "abc123",
+                    players: "4",
+                    islands: "3",
+                    ref: "twitter",
+                },
                 SEAFARERS,
                 params,
             ),
@@ -208,9 +341,11 @@ describe("isCanonical", () => {
 
     test("rejects an islands key on a variant that has no range", () => {
         expect(
-            isCanonical({ seed: "abc123", islands: "3" }, BASE_GAME, {
-                seed: "abc123",
-            }),
+            isCanonical(
+                { seed: "abc123", players: "4", islands: "3" },
+                BASE_GAME,
+                { seed: "abc123", players: 4 },
+            ),
         ).toBe(false);
     });
 });

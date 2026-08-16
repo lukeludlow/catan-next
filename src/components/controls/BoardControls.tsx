@@ -1,35 +1,40 @@
-// The islands slider and the regenerate button (ROADMAP §6) — the only
-// component in the app that runs in the browser as anything but markup.
+// The player-count toggle, the islands slider and the regenerate button
+// (ROADMAP §6, §9 Phase 8) — the only component in the app that runs in the
+// browser as anything but markup.
 //
-// It holds no board and calls no generator. Both controls do exactly one thing:
-// push a new URL. The board that comes back is rendered on the server from the
-// seed in that URL, which is what makes every board reachable by link and what
-// keeps the generator off the wire. It is also the fix for §4.5, the original's
-// regenerate leaving half the previous board's tiles on screen: there is no
-// imperative teardown here to get wrong, only a navigation.
+// It holds no board and calls no generator. Every control does exactly one
+// thing: push a new URL. The board that comes back is rendered on the server
+// from the seed in that URL, which is what makes every board reachable by link
+// and what keeps the generator off the wire. It is also the fix for §4.5, the
+// original's regenerate leaving half the previous board's tiles on screen:
+// there is no imperative teardown here to get wrong, only a navigation.
 //
-// The slider's bounds come from `variant.islands` rather than from a constant,
-// so the control follows the registry — a variant with no sea gets no slider at
-// all, and Phase 10 raising the ceiling to 7 needs no edit here.
+// Both optional controls are drawn from registry data rather than from an id
+// comparison: the slider's bounds are `variant.islands`, and the toggle appears
+// only when `game.variants.length > 1`. So a variant with no sea gets no
+// slider, a game with one player count gets no toggle, and Phase 10 adding the
+// 5-6 player Seafarers entry needs no edit here.
 
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { Variant } from "@/domain/variants";
-import { boardHref, randomSeed } from "@/routing/boardUrl";
+import { playersLabel } from "@/components/controls/playersLabel";
+import type { Game } from "@/domain/variants";
+import { variantFor } from "@/domain/variants";
+import { boardHref, paramsForPlayers, randomSeed } from "@/routing/boardUrl";
 import type { BoardParams } from "@/routing/boardUrl";
 
 export default function BoardControls({
-    variant,
+    game,
     params,
 }: {
-    variant: Variant;
+    game: Game;
     params: BoardParams;
 }) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
-    const range = variant.islands;
+    const range = variantFor(game, params.players).islands;
 
     // The value under the thumb while a drag is in progress. It is local so the
     // thumb tracks the finger at 60fps without asking the server for a board on
@@ -43,7 +48,7 @@ export default function BoardControls({
     // cleared below during render and a ref may not be.
     const [pushed, setPushed] = useState<string | null>(null);
 
-    const current = boardHref(variant, params);
+    const current = boardHref(game, params);
     // React's documented "adjust state when a prop changes" pattern, in place
     // of an effect. Whenever a navigation lands — the server's answer, or a
     // Back button — the thumb follows the URL rather than keeping a stale
@@ -58,7 +63,7 @@ export default function BoardControls({
     }
 
     function go(next: BoardParams): void {
-        const href = boardHref(variant, next);
+        const href = boardHref(game, next);
 
         if (href === pushed) {
             return;
@@ -78,9 +83,48 @@ export default function BoardControls({
 
     return (
         <div
-            className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8"
+            className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
             aria-busy={isPending}
         >
+            {game.variants.length > 1 && (
+                // A radio group of buttons rather than a `<select>`: two
+                // options both worth showing, and each one is a 44px touch
+                // target per the mobile-first rule in CLAUDE.md.
+                <div
+                    role="radiogroup"
+                    aria-label="players"
+                    className="flex shrink-0 rounded-full border border-black/15 p-1 dark:border-white/20"
+                >
+                    {game.variants.map((option) => {
+                        const selected = option.players === params.players;
+
+                        return (
+                            <button
+                                key={option.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                className={`min-h-11 rounded-full px-4 text-sm font-medium tabular-nums transition-colors ${
+                                    selected
+                                        ? "bg-[var(--terrain-sea)] text-white"
+                                        : "opacity-70 hover:opacity-100"
+                                }`}
+                                onClick={() =>
+                                    go(
+                                        paramsForPlayers(
+                                            game,
+                                            params,
+                                            option.players,
+                                        ),
+                                    )
+                                }
+                            >
+                                {playersLabel(option.players)}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
             {range !== undefined && dragged !== undefined && (
                 <div className="flex flex-1 items-center gap-3">
                     <label
