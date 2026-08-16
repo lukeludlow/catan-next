@@ -35,25 +35,29 @@ Dependencies point downward only. `domain` knows nothing about the other three;
 
 ### `src/app/` — routes
 
-One dynamic route, `[variant]/page.tsx`, plus a home page listing the registry
-and a `not-found.tsx`. It is a **server component**, and that is the point:
+One dynamic route, `[game]/page.tsx`, plus a home page listing the registry and
+a `not-found.tsx`. It is a **server component**, and that is the point:
 `generateBoard` runs on the server and only the finished SVG crosses the wire,
 so the generator never ships to the browser and a board is reproducible from its
 address.
 
-The route's whole job is four steps — look the variant up, canonicalize the
-query, redirect if the address does not already describe the board, generate and
-render. There is deliberately no `generateStaticParams`: reading `searchParams`
-makes the page dynamic by construction, and an unknown slug is turned away with
-an explicit `notFound()`.
+The route's whole job is five steps — look the game up, canonicalize the query,
+redirect if the address does not already describe the board, resolve the variant
+from the player count, generate and render. There is deliberately no
+`generateStaticParams`: reading `searchParams` makes the page dynamic by
+construction, and an unknown slug is turned away with an explicit `notFound()`.
 
 ### `src/routing/` — the query contract
 
-`boardUrl.ts` owns both directions of `(variant, seed, islands) ↔ URL`:
+`boardUrl.ts` owns both directions of `(game, players, seed, islands) ↔ URL`:
 `parseParams` and `canonicalParams` read, `boardHref` writes, and `isCanonical`
 decides whether the route should redirect. Keeping both halves in one module is
 what lets the round trip and the redirect's fixed point be ordinary unit tests,
 and it is why the route file has almost nothing testable left in it.
+
+It takes a `Game` rather than a `Variant` because which variant a URL means is
+something this module _decides_ — and it has to decide that before it can clamp
+`islands`, whose range differs per player count.
 
 It lives outside `src/domain/` because it describes the _app's_ URL shape rather
 than the game's rules — and because it is allowed the `Math.random()` that the
@@ -69,9 +73,9 @@ each with a `NumberChit` and `PortMarker` as applicable. It receives a finished
 `hexLabel.ts`.
 
 `controls/` holds the only two `"use client"` files in the repo —
-`BoardControls.tsx` (islands slider, regenerate) and `ShareLink.tsx`. Both do
-one thing: change the URL. There is no client-side board state to hold, because
-the URL _is_ the state.
+`BoardControls.tsx` (player toggle, islands slider, regenerate) and
+`ShareLink.tsx`. Both do one thing: change the URL. There is no client-side
+board state to hold, because the URL _is_ the state.
 
 Two rendering details that look like accidents and are not, both flagged in the
 code where they happen:
@@ -140,8 +144,25 @@ That is load-bearing rather than aspirational. `variants.test.ts` is
 table-driven over the registry, so the chit-pool, fillability and port-capacity
 invariants cover every variant the day it is added, and a mis-specified board
 fails at test time rather than rendering an `undefined` chit. Both the home page
-and the `/[variant]` route read the registry too, so neither needs touching
-either.
+and the `/[game]` route read the registry too, so neither needs touching either.
+
+### Games and variants
+
+Since Phase 8 the registry has two levels, and the distinction is worth holding
+onto:
+
+- A **variant** is one board — a shape, a settings object, a player count, and
+  the only display name anyone sees ("Base Game", "Base Game Extension").
+- A **game** is what the URL segment names, and holds the variants that differ
+  only by player count. It has no name of its own, because nothing renders a
+  game.
+
+`Game.variants` is a **list**, not a record keyed by player count: Seafarers has
+no 5–6 player entry until Phase 10, and a list makes "offers one player count"
+representable instead of a hole. It is also what the controls key off —
+`game.variants.length > 1` draws the player toggle,
+`variant.islands !== undefined` draws the islands slider. Neither control ever
+compares against an id, which is what lets Phase 10 be a registry edit.
 
 If adding a variant requires editing `terrain.ts`, `numbers.ts`, `ports.ts` or
 `validate.ts`, the abstraction has leaked and the right response is to fix the
@@ -172,10 +193,10 @@ full argument.
 Tests are co-located — `foo.ts` beside `foo.test.ts`, no `__tests__/`.
 
 This split is why some logic lives in plain `.ts` modules that a component could
-just as easily have inlined: `hexLabel.ts`, `boardColors.ts` and `boardUrl.ts`
-exist so that string and color logic is covered by the fast tier instead of by
-three browser launches. When something in a component is worth testing on its
-own, extracting it into a `.ts` module is the idiom.
+just as easily have inlined: `hexLabel.ts`, `boardColors.ts`, `playersLabel.ts`
+and `boardUrl.ts` exist so that string and color logic is covered by the fast
+tier instead of by three browser launches. When something in a component is
+worth testing on its own, extracting it into a `.ts` module is the idiom.
 
 The browser project loads `src/test/browserSetup.ts`, which imports
 `globals.css` and nothing else. The board draws in CSS custom properties, so

@@ -35,6 +35,25 @@ export const BASE_GAME_SHAPE: readonly Axial[] = hexRows([
     { r: 2, from: -2, to: 0 },
 ]);
 
+// The 30-hex Base Game 5-6 player extension: rows of 3-4-5-6-5-4-3 (ROADMAP §9
+// Phase 9). Unlike the two shapes either side of it, this one is not a
+// transcription of anything — the Angular original has no 5-6 player support at
+// all (§9.8) — so it is written as a shape with a closed-form description
+// instead: the cube-bounded hexagon `q ∈ [-3,2]`, `r ∈ [-3,3]`,
+// `s = -q-r ∈ [-2,3]`. That is a semi-regular hexagon with sides alternating 3
+// and 4, which is what the physical extension board is, and shapes.test.ts
+// checks those bounds in both directions rather than trusting the row table
+// below to have been typed correctly.
+export const BASE_GAME_56_SHAPE: readonly Axial[] = hexRows([
+    { r: -3, from: 0, to: 2 },
+    { r: -2, from: -1, to: 2 },
+    { r: -1, from: -2, to: 2 },
+    { r: 0, from: -3, to: 2 },
+    { r: 1, from: -3, to: 1 },
+    { r: 2, from: -3, to: 0 },
+    { r: 3, from: -3, to: -1 },
+]);
+
 // The 42-hex Seafarers frame. These are the very coordinates the original's
 // `convertHexCoordsToHexBlobCube` already produced for its 13 jagged rows — its
 // (q, r) pairs were a valid axial system all along, which is why the port needs
