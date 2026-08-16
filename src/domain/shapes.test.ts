@@ -4,6 +4,7 @@ import type { Axial } from "@/domain/hex";
 import {
     BASE_GAME_56_SHAPE,
     BASE_GAME_SHAPE,
+    SEAFARERS_56_SHAPE,
     SEAFARERS_SHAPE,
 } from "@/domain/shapes";
 
@@ -45,10 +46,34 @@ function sortedKeys(coords: readonly Axial[]): string[] {
     return coords.map(key).sort();
 }
 
+// Row lengths in ascending r — the one description of a shape that can be read
+// straight off a picture of the board.
+function rowLengths(shape: readonly Axial[]): number[] {
+    const lengths = new Map<number, number>();
+
+    for (const { r } of shape) {
+        lengths.set(r, (lengths.get(r) ?? 0) + 1);
+    }
+
+    return [...lengths.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, length]) => length);
+}
+
+// A half turn about (0, 2.5): `(q, r) -> (-q, 5 - r)`. Both Seafarers frames
+// have this symmetry, which is the whole reason it is worth asserting — a
+// property invented to fit the newer shape would prove nothing about it.
+function isPointSymmetric(shape: readonly Axial[]): boolean {
+    const hexes = mapOf(shape);
+
+    return shape.every(({ q, r }) => hexes.has(key({ q: -q, r: 5 - r })));
+}
+
 const VARIANTS = [
     { name: "base game", shape: BASE_GAME_SHAPE, hexCount: 19 },
     { name: "base game 5-6", shape: BASE_GAME_56_SHAPE, hexCount: 30 },
     { name: "seafarers", shape: SEAFARERS_SHAPE, hexCount: 42 },
+    { name: "seafarers 5-6", shape: SEAFARERS_56_SHAPE, hexCount: 52 },
 ] as const;
 
 describe.each(VARIANTS)("$name shape", ({ shape, hexCount }) => {
@@ -135,17 +160,7 @@ describe("base game 5-6 shape", () => {
     // The 3-4-5-6-5-4-3 of the physical board, which is the one fact about it
     // anyone can check by looking at the box.
     test("has rows of 3-4-5-6-5-4-3", () => {
-        const lengths = new Map<number, number>();
-
-        for (const { r } of BASE_GAME_56_SHAPE) {
-            lengths.set(r, (lengths.get(r) ?? 0) + 1);
-        }
-
-        expect(
-            [...lengths.entries()]
-                .sort(([a], [b]) => a - b)
-                .map(([, length]) => length),
-        ).toEqual([3, 4, 5, 6, 5, 4, 3]);
+        expect(rowLengths(BASE_GAME_56_SHAPE)).toEqual([3, 4, 5, 6, 5, 4, 3]);
     });
 
     // A semi-regular hexagon with sides alternating 3 and 4: three cube bounds,
@@ -260,6 +275,92 @@ describe("seafarers shape", () => {
             const around = neighborCoords(coord);
             const onBoard = around.filter((c) => hexes.has(key(c)));
             expect(neighbors(hexes, coord)).toHaveLength(onBoard.length);
+        }
+    });
+
+    test("is point-symmetric about (0, 2.5)", () => {
+        expect(isPointSymmetric(SEAFARERS_SHAPE)).toBe(true);
+    });
+
+    // The claim shapes.ts makes about the 5-6 frame's cube bounds being a
+    // coincidence rests on this one: the frame it extends is genuinely jagged,
+    // and (0,-1) is the witness — inside every bound the board spans, and not on
+    // the board. If this ever starts passing, the comment over
+    // SEAFARERS_56_SHAPE is wrong.
+    test("is not itself cube-bounded", () => {
+        const hexes = mapOf(SEAFARERS_SHAPE);
+        const spans = (bound: (c: Axial) => number, coord: Axial): boolean => {
+            const values = SEAFARERS_SHAPE.map(bound);
+            return (
+                bound(coord) >= Math.min(...values) &&
+                bound(coord) <= Math.max(...values)
+            );
+        };
+
+        const offBoard: Axial = { q: 0, r: -1 };
+
+        expect(spans((c) => c.q, offBoard)).toBe(true);
+        expect(spans((c) => c.r, offBoard)).toBe(true);
+        expect(spans((c) => -c.q - c.r, offBoard)).toBe(true);
+        expect(hexes.has(key(offBoard))).toBe(false);
+    });
+});
+
+// The 52-hex Seafarers 5-6 player frame. There is no original to pin it to
+// (ROADMAP §9.8), and unlike the Base Game extension it was not written from a
+// closed form either — it was drawn from the 42-hex frame. So containment is the
+// primary assertion here and the cube bounds are the secondary one, in the
+// reverse of the order the base-game block above uses.
+describe("seafarers 5-6 shape", () => {
+    test("has rows of 5-6-7-8-8-7-6-5", () => {
+        expect(rowLengths(SEAFARERS_56_SHAPE)).toEqual([
+            5, 6, 7, 8, 8, 7, 6, 5,
+        ]);
+    });
+
+    // The ten added hexes are the physical extension box's ten — 7 sea, 2 gold
+    // and a desert — so both halves of this are load-bearing: the 3-4 frame
+    // survives intact, and the growth is the size of the box.
+    test("contains the 3-4 player frame, and adds the box's ten hexes", () => {
+        const hexes = mapOf(SEAFARERS_56_SHAPE);
+
+        for (const coord of SEAFARERS_SHAPE) {
+            expect(hexes.has(key(coord))).toBe(true);
+        }
+
+        expect(SEAFARERS_56_SHAPE).toHaveLength(SEAFARERS_SHAPE.length + 10);
+    });
+
+    test("is point-symmetric about (0, 2.5)", () => {
+        expect(isPointSymmetric(SEAFARERS_56_SHAPE)).toBe(true);
+    });
+
+    // Both directions, so neither a stray coordinate nor a missing one can hide.
+    // Note this is an *observation* about the shape rather than its definition —
+    // see the comment over SEAFARERS_56_SHAPE, and the "is not itself
+    // cube-bounded" test above for why it is worth remarking on at all.
+    test("is the cube-bounded region shapes.ts claims", () => {
+        const withinBounds = ({ q, r }: Axial): boolean =>
+            q >= -4 &&
+            q <= 4 &&
+            r >= -1 &&
+            r <= 6 &&
+            -q - r >= -6 &&
+            -q - r <= 1;
+
+        for (const coord of SEAFARERS_56_SHAPE) {
+            expect(withinBounds(coord)).toBe(true);
+        }
+
+        const hexes = mapOf(SEAFARERS_56_SHAPE);
+
+        for (let q = -4; q <= 4; q++) {
+            for (let r = -1; r <= 6; r++) {
+                if (!withinBounds({ q, r })) {
+                    continue;
+                }
+                expect(hexes.has(key({ q, r }))).toBe(true);
+            }
         }
     });
 });

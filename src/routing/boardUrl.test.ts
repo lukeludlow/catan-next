@@ -113,20 +113,10 @@ describe("parseParams", () => {
         },
     );
 
-    test("does not report a player count this game does not offer", () => {
-        const offered = SEAFARERS.variants.map((variant) => variant.players);
-        const missing = ([4, 6] as const).find(
-            (players) => !offered.includes(players),
-        );
-
-        // Guard rather than skip: once Phase 10 gives Seafarers a 5-6 player
-        // entry this test has nothing left to say, and should be deleted rather
-        // than silently passing on an empty case.
-        expect(missing).toBeDefined();
-        expect(
-            parseParams({ players: String(missing) }, SEAFARERS).players,
-        ).toBeUndefined();
-    });
+    // A test for "a count this game does not offer" stood here until Phase 10,
+    // guarded by an assertion that such a count still existed. Every game now
+    // offers both, so the case is unrepresentable and the test is gone rather
+    // than passing on an empty search — which is what its own comment asked for.
 
     test.each(ALL_GAMES)("$id: reports the counts it offers", (game: Game) => {
         for (const variant of game.variants) {
@@ -224,6 +214,24 @@ describe("paramsForPlayers", () => {
             }
         },
     );
+
+    // The clamp above, made concrete on the one pairing where it bites: only the
+    // 5-6 player Seafarers board offers seven islands, so coming back down to
+    // the 3-4 board has to land on six rather than carry an unreachable setting
+    // into a URL the route would then have to redirect.
+    test("clamps a count the smaller board cannot offer", () => {
+        const [small, large] = SEAFARERS.variants;
+        const from: BoardParams = {
+            seed: "abc123",
+            players: large.players,
+            islands: large.islands?.max,
+        };
+
+        expect(from.islands).toBe(7);
+        expect(paramsForPlayers(SEAFARERS, from, small.players).islands).toBe(
+            small.islands?.max,
+        );
+    });
 
     test("is what the control pushes, so the address needs no redirect", () => {
         const from = canonicalParams({ seed: "abc123" }, SEAFARERS);

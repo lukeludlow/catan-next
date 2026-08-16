@@ -201,6 +201,7 @@ describe("the registry", () => {
             "base-game",
             "base-game-56",
             "seafarers",
+            "seafarers-56",
         ]);
     });
 
@@ -222,6 +223,7 @@ describe("the registry", () => {
         expect(VARIANTS["base-game"].shape).toHaveLength(19);
         expect(VARIANTS["base-game-56"].shape).toHaveLength(30);
         expect(VARIANTS.seafarers.shape).toHaveLength(42);
+        expect(VARIANTS["seafarers-56"].shape).toHaveLength(52);
     });
 
     test("finds every variant by its own id", () => {

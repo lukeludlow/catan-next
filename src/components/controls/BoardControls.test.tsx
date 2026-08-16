@@ -162,6 +162,26 @@ describe("BoardControls", () => {
         expect(slider?.value).toBe(String(range?.default));
     });
 
+    // The ceiling belongs to the *variant*, not the game, and Phase 10 is the
+    // first time one game's two boards disagree about it. Both halves read off
+    // the registry, so this asserts the wiring rather than the number 7.
+    test("follows the player count when the two boards disagree", async () => {
+        const [small, large] = SEAFARERS.variants;
+        const { container } = await render(
+            <BoardControls
+                game={SEAFARERS}
+                params={canonicalParams(
+                    { seed: "abc123", players: "6" },
+                    SEAFARERS,
+                )}
+            />,
+        );
+        const slider = container.querySelector<HTMLInputElement>("#islands");
+
+        expect(large.islands?.max).toBeGreaterThan(small.islands?.max ?? 0);
+        expect(slider?.max).toBe(String(large.islands?.max));
+    });
+
     // A board with no sea is always one landmass, so a slider would be a
     // control with nothing to control.
     test("draws no slider for a variant with no islands range", async () => {

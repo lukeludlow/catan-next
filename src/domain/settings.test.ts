@@ -3,8 +3,10 @@ import {
     BASE_GAME_56_SETTINGS,
     BASE_GAME_SETTINGS,
     RESOURCE_TERRAINS,
+    SEAFARERS_56_SETTINGS,
     SEAFARERS_SETTINGS,
 } from "@/domain/settings";
+import { SEAFARERS_56_SHAPE } from "@/domain/shapes";
 
 // The invariants that hold across every variant live in variants.test.ts, where
 // they are table-driven over the registry (ROADMAP §9.8). What is left here is
@@ -119,7 +121,7 @@ describe("base game 5-6 settings", () => {
         });
     });
 
-    // The two 28-chit variants share one bag object in settings.ts. Each is
+    // The three 28-chit variants share one bag object in settings.ts. Each is
     // pinned against its own literal above, so this only records that the
     // sharing is deliberate — and would fail loudly if one were ever edited in
     // the belief that it stood alone.
@@ -181,6 +183,88 @@ describe("seafarers settings", () => {
             wheat: 1,
             any: 5,
         });
+    });
+});
+
+// ROADMAP §9 Phase 10. The only variant here whose bag was settled by a rulebook
+// rather than by a component count: the 5-6 extension ships no number tokens at
+// all, and its rules send you to CATAN's 18 plus CATAN 5-6's 10 — the same 28
+// every other large board deals from.
+describe("seafarers 5-6 settings", () => {
+    test("has the tile mix of the three boxes combined", () => {
+        expect(SEAFARERS_56_SETTINGS.terrainCounts).toEqual({
+            brick: { min: 3, max: 7 },
+            desert: { min: 0, max: 0 },
+            gold: { min: 0, max: 4 },
+            rock: { min: 3, max: 7 },
+            sea: { min: 24, max: 26 },
+            sheep: { min: 3, max: 7 },
+            tree: { min: 3, max: 7 },
+            wheat: { min: 3, max: 7 },
+        });
+    });
+
+    // ROADMAP §11, as seafarers. The 5-6 extension box does contain a desert,
+    // which is counted toward the frame's ten added hexes but not dealt — the
+    // app has no robber to put on one.
+    test("has no deserts", () => {
+        expect(SEAFARERS_56_SETTINGS.terrainCounts.desert).toEqual({
+            min: 0,
+            max: 0,
+        });
+    });
+
+    test("has 28 chits", () => {
+        expect(SEAFARERS_56_SETTINGS.diceNumbers).toEqual({
+            2: 2,
+            3: 3,
+            4: 3,
+            5: 3,
+            6: 3,
+            8: 3,
+            9: 3,
+            10: 3,
+            11: 3,
+            12: 2,
+        });
+    });
+
+    // The sea minimum is the one number in this object that is derived rather
+    // than transcribed, and it is derived *from* the two above: 52 hexes less 24
+    // sea is 28 resource hexes, which is exactly the chit pool. Restated here as
+    // arithmetic so that changing the frame, the bag, or the minimum without the
+    // other two fails on a line that explains itself, rather than only inside
+    // variants.test.ts's general invariant.
+    test("floors the sea at exactly the count the chit pool allows", () => {
+        const chits = Object.values(SEAFARERS_56_SETTINGS.diceNumbers).reduce(
+            (total, count) => total + count,
+            0,
+        );
+
+        expect(
+            SEAFARERS_56_SHAPE.length -
+                SEAFARERS_56_SETTINGS.terrainCounts.sea.min,
+        ).toBe(chits);
+    });
+
+    // ROADMAP §11, the same caveat as the Base Game extension: the box lists two
+    // harbor tokens without saying which, so both are assumed generic. Nothing
+    // automated can catch this being wrong.
+    test("has twelve ports, seven of them any", () => {
+        expect(SEAFARERS_56_SETTINGS.ports).toEqual({
+            brick: 1,
+            rock: 1,
+            sheep: 1,
+            tree: 1,
+            wheat: 1,
+            any: 7,
+        });
+    });
+
+    test("draws from the same chit bag as seafarers", () => {
+        expect(SEAFARERS_56_SETTINGS.diceNumbers).toEqual(
+            SEAFARERS_SETTINGS.diceNumbers,
+        );
     });
 });
 

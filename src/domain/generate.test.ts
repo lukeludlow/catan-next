@@ -23,10 +23,12 @@ function serialize(board: Board): string {
     return JSON.stringify([...board.hexes.entries()]);
 }
 
-// Seafarers is the only variant with sea, so it is the only one that takes an
-// islands setting. The Base Game passes none.
+// A variant with sea takes an islands setting; one without passes none. Read off
+// the registry rather than compared against an id — the id form silently sent
+// Phase 10's second sea-bearing variant down the scatter branch, which is the
+// mistake variants.ts:49 warns production code away from.
 function islandsFor(variant: Variant): number | undefined {
-    return variant.id === "seafarers" ? 3 : undefined;
+    return variant.islands?.default;
 }
 
 function build(variant: Variant, seed: number, islands = islandsFor(variant)) {
@@ -176,18 +178,38 @@ describe("generateBoard: board shapes", () => {
     });
 });
 
-// The point of replacing rejection sampling: the top of the original's slider
-// is now as cheap as the middle. Under ROADMAP §5's approach six islands
-// accepted 0.045% of boards, so this test would not have finished.
-describe.each([1, 2, 3, 4, 5, 6])(
-    "generateBoard: seafarers with %i island(s)",
-    (islands) => {
+// The point of replacing rejection sampling: the top of the slider is now as
+// cheap as the middle. Under ROADMAP §5's approach six islands accepted 0.045%
+// of boards, so this test would not have finished — and seven, which the 5-6
+// player frame offers, was unreachable at any budget.
+//
+// Generated from each variant's own range rather than written out, so no control
+// can offer a setting this sweep has not proven. Phase 10's seventh setting
+// needed no edit here, which is the same claim `variant.islands` makes about the
+// slider itself.
+const ISLAND_CASES = ALL_VARIANTS.flatMap((variant) => {
+    const range = variant.islands;
+
+    if (range === undefined) {
+        return [];
+    }
+
+    return Array.from({ length: range.max - range.min + 1 }, (_, offset) => ({
+        name: variant.name,
+        variant,
+        islands: range.min + offset,
+    }));
+});
+
+describe.each(ISLAND_CASES)(
+    "generateBoard: $name with $islands island(s)",
+    ({ variant, islands }) => {
         test("hits the requested count on every seed", () => {
             for (let seed = 0; seed < 60; seed++) {
-                const board = build(VARIANTS.seafarers, seed, islands);
+                const board = build(variant, seed, islands);
 
                 expect(countIslands(board.hexes)).toBe(islands);
-                expectValid(board, VARIANTS.seafarers, islands);
+                expectValid(board, variant, islands);
             }
         });
     },

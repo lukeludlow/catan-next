@@ -152,17 +152,20 @@ Since Phase 8 the registry has two levels, and the distinction is worth holding
 onto:
 
 - A **variant** is one board — a shape, a settings object, a player count, and
-  the only display name anyone sees ("Base Game", "Base Game Extension").
+  the only display name anyone sees ("Base Game", "Base Game Extension",
+  "Seafarers", "Seafarers Extension").
 - A **game** is what the URL segment names, and holds the variants that differ
   only by player count. It has no name of its own, because nothing renders a
   game.
 
-`Game.variants` is a **list**, not a record keyed by player count: Seafarers has
-no 5–6 player entry until Phase 10, and a list makes "offers one player count"
-representable instead of a hole. It is also what the controls key off —
-`game.variants.length > 1` draws the player toggle,
-`variant.islands !== undefined` draws the islands slider. Neither control ever
-compares against an id, which is what lets Phase 10 be a registry edit.
+`Game.variants` is a **list**, not a record keyed by player count. Both games
+offer both counts as of Phase 10, but Seafarers had only one entry for two
+phases, and a list makes "offers one player count" representable instead of a
+hole. It is also what the controls key off — `game.variants.length > 1` draws
+the player toggle, `variant.islands !== undefined` draws the islands slider, and
+the slider's bounds are the _variant's_, which is why Seafarers' two boards can
+differ on how many islands they offer. Neither control ever compares against an
+id, which is what made Phase 10 a registry edit.
 
 If adding a variant requires editing `terrain.ts`, `numbers.ts`, `ports.ts` or
 `validate.ts`, the abstraction has leaked and the right response is to fix the

@@ -2,8 +2,12 @@ import { describe, expect, test } from "vitest";
 import { key, neighbors } from "@/domain/hex";
 import { mulberry32 } from "@/domain/rng";
 import { BASE_GAME_SETTINGS, RESOURCE_TERRAINS } from "@/domain/settings";
-import { SEAFARERS_SETTINGS } from "@/domain/settings";
-import { BASE_GAME_SHAPE, SEAFARERS_SHAPE } from "@/domain/shapes";
+import { SEAFARERS_56_SETTINGS, SEAFARERS_SETTINGS } from "@/domain/settings";
+import {
+    BASE_GAME_SHAPE,
+    SEAFARERS_56_SHAPE,
+    SEAFARERS_SHAPE,
+} from "@/domain/shapes";
 import { placeTerrain } from "@/domain/terrain";
 import type { Hex, Terrain } from "@/domain/types";
 
@@ -14,6 +18,15 @@ function seafarers(seed: number, islands?: number, minIslandSize = 2) {
     return placeTerrain(
         SEAFARERS_SHAPE,
         SEAFARERS_SETTINGS,
+        { islands, minIslandSize },
+        mulberry32(seed),
+    );
+}
+
+function seafarers56(seed: number, islands?: number, minIslandSize = 2) {
+    return placeTerrain(
+        SEAFARERS_56_SHAPE,
+        SEAFARERS_56_SETTINGS,
         { islands, minIslandSize },
         mulberry32(seed),
     );
@@ -224,6 +237,51 @@ describe("island growth", () => {
         expect(seafarers(1, 30)).toBeNull();
         expect(seafarers(1, 6, 20)).toBeNull();
     });
+});
+
+// ROADMAP §9 Phase 10 flagged the larger frame as where farthest-point seeding
+// would get tight, and the slider's new seventh setting as the place to look for
+// it. Both sweeps are the 42-hex ones above, re-run against the 52-hex frame and
+// carried one setting further.
+describe("island growth on the 5-6 player frame", () => {
+    test.each([1, 2, 3, 4, 5, 6, 7])(
+        "grows exactly %i island(s)",
+        (islands) => {
+            for (let seed = 0; seed < 40; seed++) {
+                const hexes = seafarers56(seed, islands);
+
+                if (hexes === null) {
+                    continue;
+                }
+
+                expect(islandSizes(hexes)).toHaveLength(islands);
+            }
+        },
+    );
+
+    test.each([1, 2, 3, 4, 5, 6, 7])(
+        "grows %i island(s) within a few attempts, every time",
+        (islands) => {
+            const rng = mulberry32(2024);
+
+            for (let board = 0; board < 200; board++) {
+                let attempts = 0;
+                let hexes = null;
+
+                while (hexes === null && attempts < 40) {
+                    attempts++;
+                    hexes = placeTerrain(
+                        SEAFARERS_56_SHAPE,
+                        SEAFARERS_56_SETTINGS,
+                        { islands, minIslandSize: 2 },
+                        rng,
+                    );
+                }
+
+                expect(hexes).not.toBeNull();
+            }
+        },
+    );
 });
 
 describe("placeTerrain without an island constraint", () => {

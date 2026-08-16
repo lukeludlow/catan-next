@@ -30,7 +30,10 @@ const SEED = 20260815;
 function build(variant: Variant, seed = SEED): Board {
     return generateBoard(
         variant,
-        { islands: variant.id === "seafarers" ? 3 : undefined },
+        // Off the registry, never an id comparison (variants.ts:49): a variant
+        // with sea wants an islands count, and there are two of them as of
+        // Phase 10.
+        { islands: variant.islands?.default },
         mulberry32(seed),
     );
 }
