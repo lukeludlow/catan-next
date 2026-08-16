@@ -4,10 +4,10 @@
 // Seafarers pipeline, and that duplicate code path is deleted rather than
 // ported.
 //
-// Every row of both shapes turns out to be a contiguous run of q, so one
-// helper describes both — and will describe the 5-6 player boards in Phases
-// 9-10 too. Note this is a *description* of an axial shape, not a revival of
-// offset math: no row parity rule, no coordinate conversion, no inverse.
+// Every row of every shape turns out to be a contiguous run of q, so one helper
+// describes all four, the 5-6 player boards of Phases 9-10 included. Note this
+// is a *description* of an axial shape, not a revival of offset math: no row
+// parity rule, no coordinate conversion, no inverse.
 
 import type { Axial } from "@/domain/hex";
 
@@ -68,4 +68,37 @@ export const SEAFARERS_SHAPE: readonly Axial[] = hexRows([
     { r: 4, from: -3, to: 2 },
     { r: 5, from: -3, to: 1 },
     { r: 6, from: -3, to: -1 },
+]);
+
+// The 52-hex Seafarers 5-6 player frame (ROADMAP §9 Phase 10). Like the Base
+// Game extension above there is no original to transcribe, but unlike it this
+// one is not invented from a closed form either: it is the 42-hex frame with one
+// hex added to the trailing edge of every row and one more at each of the two
+// short caps. That is ten hexes, which is exactly what the physical 5-6 player
+// extension box holds — 7 sea, 2 gold and a desert — so the frame grows by its
+// components rather than by a number someone liked.
+//
+// Three properties follow, and shapes.test.ts checks all three rather than
+// restating the row table:
+//
+//   - it contains SEAFARERS_SHAPE, and is exactly 10 hexes larger;
+//   - it is point-symmetric about (0, 2.5), i.e. `(q, r) -> (-q, 5 - r)` maps it
+//     onto itself. So is SEAFARERS_SHAPE, which is why the test asserts it for
+//     both — a property invented to fit one new shape would prove nothing;
+//   - it is the cube-bounded region `q ∈ [-4,4]`, `r ∈ [-1,6]`,
+//     `s = -q-r ∈ [-6,1]`.
+//
+// The last one was not the goal and is worth flagging as a coincidence: the
+// 42-hex frame it extends is *not* cube-bounded — (0,-1) sits inside its bounds
+// and off its board — and adding the ten hexes is what happens to regularize the
+// outline. The test takes the free bidirectional check anyway.
+export const SEAFARERS_56_SHAPE: readonly Axial[] = hexRows([
+    { r: -1, from: 0, to: 4 },
+    { r: 0, from: -1, to: 4 },
+    { r: 1, from: -2, to: 4 },
+    { r: 2, from: -3, to: 4 },
+    { r: 3, from: -4, to: 3 },
+    { r: 4, from: -4, to: 2 },
+    { r: 5, from: -4, to: 1 },
+    { r: 6, from: -4, to: 0 },
 ]);

@@ -58,11 +58,14 @@ export const BASE_GAME_SETTINGS: MapSettings = {
     ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 4 },
 };
 
-// 28 chits: 2x2, 3-6 x3, 8-11 x3, 12x2. Seafarers and the Base Game 5-6 player
-// extension ship the same bag, which is a coincidence of the two boxes rather
-// than a rule — but it is a coincidence worth naming once instead of typing
-// twice. settings.test.ts still pins each variant's bag against its own
-// literal, so sharing the object cannot let one drift unnoticed.
+// 28 chits: 2x2, 3-6 x3, 8-11 x3, 12x2. All three of the larger boards deal
+// from this bag. For Seafarers and the Base Game 5-6 player extension that is a
+// coincidence of two boxes; for Seafarers 5-6 it is the same 28 arrived at a
+// third way, because its rules have you set the Seafarers discs aside and use
+// CATAN's 18 plus CATAN 5-6's 10 instead. Three ways to the same bag is worth
+// naming once rather than typing three times. settings.test.ts still pins each
+// variant's bag against its own literal, so sharing the object cannot let one
+// drift unnoticed.
 const EXTENSION_DICE_NUMBERS: MapSettings["diceNumbers"] = {
     2: 2,
     3: 3,
@@ -120,4 +123,39 @@ export const SEAFARERS_SETTINGS: MapSettings = {
     },
     diceNumbers: EXTENSION_DICE_NUMBERS,
     ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 5 },
+};
+
+// Seafarers for 5-6 players (ROADMAP §9 Phase 10). The maxes are what three
+// boxes hold between them — the Seafarers box, the CATAN 5-6 extension, and the
+// Seafarers 5-6 extension's 7 sea, 2 gold and 1 desert — so each resource is
+// 5+2, gold is 2+2 and sea is 19+7. The mins keep the 3-4 board's proportion of
+// roughly two fifths of the max.
+//
+// The chit bag does *not* grow with the board, which is the fact this variant is
+// really built around: the 5-6 extension ships no number tokens, and its rules
+// have you use CATAN's plus CATAN 5-6's — the same 28. So a 5-6 player Seafarers
+// board is a bigger *ocean* rather than much more land, and it is bounded by 28
+// resource hexes exactly as the 3-4 board is bounded by 27.
+export const SEAFARERS_56_SETTINGS: MapSettings = {
+    terrainCounts: {
+        brick: { min: 3, max: 7 },
+        // ROADMAP §11, as seafarers: no deserts, and no robber to put on one.
+        desert: { min: 0, max: 0 },
+        gold: { min: 0, max: 4 },
+        rock: { min: 3, max: 7 },
+        // Derived rather than chosen (ROADMAP §9 Phase 10): land is whatever the
+        // 52-hex frame has left over after sea, so the sea minimum is what caps
+        // the resource hexes. 52 - 24 = 28, the chit pool exactly — one lower
+        // and a board could want a 29th chit that does not exist.
+        sea: { min: 24, max: 26 },
+        sheep: { min: 3, max: 7 },
+        tree: { min: 3, max: 7 },
+        wheat: { min: 3, max: 7 },
+    },
+    diceNumbers: EXTENSION_DICE_NUMBERS,
+    // ROADMAP §11, and the same caveat as the Base Game extension: the box lists
+    // "2 harbor tokens" without saying which, so both are taken generic on top
+    // of Seafarers' ten. Every other number in this object is checkable by a
+    // test; this one is only checkable against the components.
+    ports: { brick: 1, rock: 1, sheep: 1, tree: 1, wheat: 1, any: 7 },
 };

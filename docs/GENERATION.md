@@ -155,10 +155,11 @@ nothing, because the grower enforces it while building rather than by rejection.
 
 `maxVertexPips` is measured over `vertexTriples` in `hex.ts`: every place three
 hexes meet, which is where a settlement goes. A 6 or 8 is worth 5 pips, a 2 or
-12 one. Seafarers has 62 such vertices, the Base Game 24, and its 5–6 player
-extension 42. Left unbounded, guided boards put a 13-pip vertex on 34% of
-Seafarers boards and 54% of Base Game boards — see "Measured cost" below for
-what the cap costs on the extension board, which is where it bites hardest.
+12 one. The Base Game has 24 such vertices, its 5–6 player extension 42,
+Seafarers 62 and its extension 80. Left unbounded, guided boards put a 13-pip
+vertex on roughly a third of Seafarers boards and a half of Base Game ones — see
+"Measured cost" below, which is also where the cap turns out to bite hardest on
+the _smallest_ of the two extension boards rather than the largest.
 
 The last two are the only rules still enforced by resampling — they depend on
 the whole deal, so there is nothing to construct them from. Together they cost
@@ -215,29 +216,42 @@ islands setting.
 ## Measured cost
 
 End to end, against the real implementation: 5,000 boards per configuration, one
-shared `Rng`, default options.
+shared `Rng`, default options. Re-measured in full when Phase 10 landed — the
+whole table comes from one run, because the machine is not recorded anywhere and
+a new row is only comparable to rows measured beside it. The Phase 9 figures it
+replaces were within 8% throughout.
 
 | Configuration     | Boards | Failures | ms/board |
 | ----------------- | ------ | -------- | -------- |
-| Base Game         | 5,000  | 0        | 0.42     |
-| Base Game 5–6     | 5,000  | 0        | 4.33     |
-| Seafarers, 1 isle | 5,000  | 0        | 1.47     |
-| Seafarers, 2      | 5,000  | 0        | 0.92     |
-| Seafarers, 3      | 5,000  | 0        | 0.73     |
-| Seafarers, 4      | 5,000  | 0        | 0.60     |
-| Seafarers, 5      | 5,000  | 0        | 0.53     |
-| Seafarers, 6      | 5,000  | 0        | 0.55     |
+| Base Game         | 5,000  | 0        | 0.44     |
+| Base Game 5–6     | 5,000  | 0        | 4.44     |
+| Seafarers, 1 isle | 5,000  | 0        | 1.56     |
+| Seafarers, 2      | 5,000  | 0        | 1.00     |
+| Seafarers, 3      | 5,000  | 0        | 0.81     |
+| Seafarers, 4      | 5,000  | 0        | 0.68     |
+| Seafarers, 5      | 5,000  | 0        | 0.60     |
+| Seafarers, 6      | 5,000  | 0        | 0.63     |
+| Seafarers 5–6, 1  | 5,000  | 0        | 2.51     |
+| Seafarers 5–6, 2  | 5,000  | 0        | 1.54     |
+| Seafarers 5–6, 3  | 5,000  | 0        | 1.16     |
+| Seafarers 5–6, 4  | 5,000  | 0        | 0.96     |
+| Seafarers 5–6, 5  | 5,000  | 0        | 0.83     |
+| Seafarers 5–6, 6  | 5,000  | 0        | 0.76     |
+| Seafarers 5–6, 7  | 5,000  | 0        | 0.71     |
 
-40,000 boards, no failures. One island is the _slowest_ Seafarers setting, not
-the fastest: a single landmass concentrates the chits, so the pip cap and the
-adjacent-numbers rule both bite harder and it takes more re-deals. Compare the
-~2,000 attempts and ~40 ms that six islands cost under rejection sampling.
+75,000 boards, no failures. One island is the _slowest_ setting on both
+Seafarers frames, not the fastest: a single landmass concentrates the chits, so
+the pip cap and the adjacent-numbers rule both bite harder and it takes more
+re-deals. The slider gets cheaper monotonically from there, which is why the
+52-hex frame's seventh island — the most a board here can be asked for — is also
+the cheapest board it makes. Compare the ~2,000 attempts and ~40 ms that six
+islands cost under rejection sampling.
 
 **The Base Game 5–6 player board is the most expensive in the app**, at ten
 times its 3–4 player counterpart, and Phase 9 measured why rather than leaving
 it as a surprise. It is 28 numbered hexes out of 30 with three of every middle
 number — the densest deal here, and the one with the least room to satisfy a
-rule. Relaxing `maxVertexPips` to infinity takes it from 4.33 ms to 1.86, so a
+rule. Relaxing `maxVertexPips` to infinity takes it from 4.42 ms to 1.91, so a
 little over half the cost is the pip cap and the rest is board size and
 `noAdjacentEqualNumbers`. Left uncapped, **57.4% of its boards carry a 13-pip
 vertex**, against 44.7% for the 3–4 player board over the same run:
@@ -245,19 +259,40 @@ vertex**, against 44.7% for the 3–4 player board over the same run:
 | Configuration | Vertices | 13-pip vertex, uncapped | ms/board capped | uncapped |
 | ------------- | -------- | ----------------------- | --------------- | -------- |
 | Base Game     | 24       | 44.7%                   | 0.42            | 0.26     |
-| Base Game 5–6 | 42       | 57.4%                   | 4.33            | 1.86     |
+| Base Game 5–6 | 42       | 57.4%                   | 4.42            | 1.91     |
+| Seafarers     | 62       | 30.2%                   | 0.80            | 0.64     |
+| Seafarers 5–6 | 80       | 31.1%                   | 1.15            | 0.90     |
 
-The cap stays at 12. Four milliseconds on a request that renders one board is
-not a cost worth trading a balance rule for, and the retry loop absorbs it with
-no failures in 5,000 — the 200-deal ceiling per layout is nowhere near reached.
-This is also a partial answer to the question Phase 10 is asked below: the pip
-cap does reject more on a bigger board, and it is still affordable.
+**Phase 10 asked whether the 12-pip cap outgrows its usefulness on a bigger
+frame, and the answer is no** — the premise was wrong. More land does mean more
+vertices, 80 against 62, but on a Seafarers board the extra land arrives as more
+_islands_ rather than as denser land, and the pip tail barely moves: 31.1%
+against 30.2%. What drives the cap's cost is concentration, not size, which is
+why the 30-hex Base Game extension is nearly twice as likely to need it as the
+52-hex Seafarers one. It costs 0.25 ms there against 2.5 ms on the Base Game
+extension.
+
+The cap stays at 12 everywhere. Four milliseconds on a request that renders one
+board is not a cost worth trading a balance rule for, and the retry loop absorbs
+it with no failures in 5,000 — the 200-deal ceiling per layout is nowhere near
+reached.
 
 Terrain growth alone, single attempt, 3,000 layouts per setting:
 
-| islands  | 1–3  | 4     | 5     | 6     | 7    |
-| -------- | ---- | ----- | ----- | ----- | ---- |
-| succeeds | 100% | 99.9% | 94.3% | 53.8% | 5.1% |
+| islands             | 1    | 2    | 3    | 4     | 5     | 6     | 7     |
+| ------------------- | ---- | ---- | ---- | ----- | ----- | ----- | ----- |
+| Seafarers, 42 hexes | 100% | 100% | 100% | 99.9% | 93.8% | 54.1% | 5.1%  |
+| Seafarers 5–6, 52   | 100% | 100% | 100% | 100%  | 99.7% | 98.1% | 92.8% |
+
+**This is the other Phase 10 expectation that came out backwards.** The larger
+frame was supposed to be where farthest-point seeding got tight, and where the
+variant might need its own `maxAttempts`. It is the opposite: the extra ten
+hexes are almost all ocean, so seeds have more room to be far apart and islands
+have more room to grow without touching, and single-attempt growth at _seven_
+islands on the 52-hex frame (92.8%) beats _six_ on the 42-hex one (54.1%) by a
+wide margin. The 5.1% in the top-right cell is why the seventh setting is
+offered on the larger board only. `maxAttempts` stays at the shared 1000 and no
+per-variant override was added.
 
 ## Adding a variant
 
@@ -268,11 +303,18 @@ new code paths in the generator. If a new variant requires touching
 and the right response is to fix the abstraction rather than special-case the
 variant.
 
-Two things to re-measure when Phase 10 adds the larger Seafarers frame, and to
-record in the tables above:
+Phase 9 and Phase 10 both held to that: four variants exist and those four
+modules have never been opened for one. Two test-side habits are worth keeping,
+because Phase 10 broke both:
 
-- **The growth success rate at the top of the slider.** A bigger frame with more
-  islands is where the farthest-point seeding gets tight, and it may want its
-  own `maxAttempts`.
-- **The pip cap.** More land means more vertices and a longer tail, so 12 pips
-  may reject more than it usefully constrains.
+- **Never ask a variant who it is.** `variant.id === "seafarers"` appeared twice
+  in the test tree as a way to decide whether to pass an islands count, and both
+  copies silently sent the second sea-bearing variant down the scatter branch.
+  Read `variant.islands` instead, the same way the controls do.
+- **Sweep each variant's own range, not a literal.** `generate.test.ts` builds
+  its islands table from `variant.islands`, so a variant that offers a seventh
+  setting is swept at seven without an edit.
+
+And re-measure into the tables above, since a new row is only comparable to rows
+measured in the same run: the timing table end to end, the pip cap, and
+single-attempt growth at the top of the new variant's slider.

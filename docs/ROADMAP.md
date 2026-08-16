@@ -529,11 +529,12 @@ Update the status column in place as phases land.
 | —   | _milestone: parity with the old app, deployed_ |        |
 | 8   | Variant registry and player-count selector     | ✅     |
 | 9   | Base Game 5–6 player extension                 | ✅     |
-| 10  | Seafarers 5–6 player                           | ⬜     |
+| 10  | Seafarers 5–6 player                           | ✅     |
 
 Phases 0–7 reach parity with the deployed Angular app. Phases 8–10 are new
 capability the original never had (§9.8 explains why they are cheap once §3 has
-landed) and can be picked up in later sessions without disturbing 0–7.
+landed) and were picked up in later sessions without disturbing 0–7. All ten
+have landed.
 
 **Definition of done, every phase:** new code has co-located tests,
 `./verify.sh` passes end to end, and the work is committed. Phases 0 and 1
@@ -1015,6 +1016,67 @@ exposing it in Phase 8's controls.
 ~200-seed sample at every islands setting the slider offers, and all invariants
 hold.
 
+**Landed, and §9.8 held a second time.** Three data edits again —
+`SEAFARERS_56_SHAPE`, `SEAFARERS_56_SETTINGS`, one registry entry — and
+`terrain.ts`, `numbers.ts`, `ports.ts` and `validate.ts` were not opened. The
+first run after registering it failed **two** assertions, both of them tripwires
+rather than leaks: the literal list of registry ids, and a `boardUrl.test.ts`
+case whose own comment said to delete it once Seafarers had a 5–6 player entry.
+
+- **The chit bag does not scale, and that is the fact the variant is built
+  around.** The 5–6 extension box adds ten hexes (7 sea, 2 gold, 1 desert), two
+  harbours, and **no number tokens**: its rules have you set the Seafarers discs
+  aside and use CATAN's 18 plus CATAN 5-6's 10, which is bit-for-bit the same 28
+  already in `EXTENSION_DICE_NUMBERS`. So this board is a bigger _ocean_, not
+  much more land — sea 24–26 against 15–19, resource hexes 26–28 against 23–27 —
+  and §11 records that so nobody later "fixes" the scaling. A derived 38-chit
+  bag was considered and rejected with the user in favour of the rulebook.
+- **`sea.min` is derived, not chosen.** 52 hexes less 24 sea is 28 resource
+  hexes, exactly the pool, the same "nothing spare" the other three variants
+  have. §Phase 10 above says to derive it rather than guess; `settings.test.ts`
+  restates the arithmetic so that changing the frame, the bag or the minimum
+  without the other two fails on a line that explains itself.
+- **The frame is drawn, not derived** — a decision taken with the user against a
+  fresh regular hexagon. It is the 42-hex frame with one hex on the trailing
+  edge of every row and one more at each short cap: ten, which is what the box
+  holds. A hand-drawn outline normally leaves its test with nothing to say but
+  the row table back, so three independent properties carry it instead —
+  containment of the 42-hex frame, point symmetry about (0, 2½), and cube
+  bounds. The last is a coincidence rather than the design (the frame it extends
+  is _not_ cube-bounded) and `shapes.test.ts` pins that claim too, with (0,-1)
+  as the witness.
+- **Both Phase 10 warnings above came out backwards, which is the return on
+  measuring rather than assuming.** The larger frame was expected to be where
+  farthest-point seeding got tight and where the variant might want its own
+  `maxAttempts`: instead single-attempt growth at _seven_ islands on 52 hexes
+  succeeds 92.8% of the time against _six_ on 42 hexes at 54.1%, because the ten
+  added hexes are nearly all ocean and give seeds room. And the 12-pip cap was
+  expected to reject more than it usefully constrains on a bigger frame: it puts
+  a 13-pip vertex on 31.1% of uncapped boards against Seafarers' 30.2%, because
+  what costs the cap is concentration rather than size. `maxAttempts` stays at
+  the shared 1000, no per-variant override was added, and the cap stays at 12.
+- **It is not the most expensive board in the app** — 0.71 to 2.51 ms across the
+  slider, against the Base Game extension's 4.44, with no failures in 35,000.
+  Its seventh island is its _cheapest_ setting. `GENERATION.md` carries all
+  three tables, re-measured end to end in one run so the new rows are comparable
+  to the old ones.
+- **The slider ceiling is 7 on this board and stays 6 on the 3–4 player one.**
+  Seven is unreachable on the smaller frame (5.1% single-attempt growth), and
+  the 3–4 board's range is the original's, transcribed. This is the first time
+  one game's two boards disagree about a control's bounds, and nothing in
+  `BoardControls.tsx` or `boardUrl.ts` was edited to allow it —
+  `paramsForPlayers` already re-clamped 7 down to 6 when switching player
+  counts.
+
+**Two test-side habits worth carrying forward**, both broken here: `islandsFor`
+in `generate.test.ts` and `build` in `BoardSvg.test.tsx` each decided whether to
+pass an islands count with `variant.id === "seafarers"`, which silently sent the
+second sea-bearing variant down the scatter branch. Both now read
+`variant.islands`, the same way the controls do — the id comparison §9.8 warns
+production code away from is just as wrong in a test. And `generate.test.ts`
+builds its islands sweep from each variant's own range rather than a `[1..6]`
+literal, so the seventh setting was covered without an edit.
+
 ---
 
 ## 10. Verification
@@ -1070,6 +1132,16 @@ Recorded so a future reader does not "fix" them by accident:
   this one is only checkable against the box. If someone with the components to
   hand finds it wrong, correcting it is a one-line edit and a one-line test
   change, and nothing else in the generator cares.
+- **Both 5–6 player harbour mixes are assumed, not transcribed.** The same is
+  true of `SEAFARERS_56_SETTINGS.ports`: the 5–6 player Seafarers box lists "2
+  harbor tokens" without saying which, so they are taken to be generic on top of
+  Seafarers' ten — `any: 7` plus one 2:1 per resource, twelve in all. Same
+  caveat, same one-line fix if someone with the components disagrees.
+- **The 5–6 player Seafarers board is a bigger ocean, not much more land.** Its
+  frame is 52 hexes against 42, but its chit bag is the same 28, because the
+  extension ships no number tokens and its rules send you to CATAN's 18 plus
+  CATAN 5–6's 10. So resource hexes go from 23–27 to 26–28 while sea goes from
+  15–19 to 24–26. That is the physical game, not an oversight in the scaling.
 
 Not carried forward, and equally deliberate: the three balance rules of §4.9 are
 **new**, so a board from this app will not look like one from

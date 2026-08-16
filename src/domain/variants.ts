@@ -21,11 +21,13 @@ import type { Axial } from "@/domain/hex";
 import {
     BASE_GAME_56_SETTINGS,
     BASE_GAME_SETTINGS,
+    SEAFARERS_56_SETTINGS,
     SEAFARERS_SETTINGS,
 } from "@/domain/settings";
 import {
     BASE_GAME_56_SHAPE,
     BASE_GAME_SHAPE,
+    SEAFARERS_56_SHAPE,
     SEAFARERS_SHAPE,
 } from "@/domain/shapes";
 import type { MapSettings } from "@/domain/types";
@@ -35,7 +37,8 @@ import type { MapSettings } from "@/domain/types";
 // heading, the title and the home page card all name a *variant*.
 export type GameId = "base-game" | "seafarers";
 
-export type VariantId = "base-game" | "base-game-56" | "seafarers";
+export type VariantId =
+    "base-game" | "base-game-56" | "seafarers" | "seafarers-56";
 
 // 4 means the 3-4 player board, 6 the 5-6 player extension. The physical boxes
 // are labelled by their upper bound, and so is `?players=`.
@@ -44,16 +47,17 @@ export type PlayerCount = 4 | 6;
 // What the islands control is allowed to ask this variant for, or `undefined`
 // when the variant has no sea and is therefore always one landmass. Data on the
 // registry rather than a constant inside the control, for the same reason the
-// shape and the settings are: Phase 10 expects to raise the ceiling to 7 for
-// the larger Seafarers frame, and a control that reads the range off the
-// variant needs no edit to follow. Whether a slider is drawn at all is
+// shape and the settings are — and Phase 10 collected on that: the 5-6 player
+// Seafarers frame raised the ceiling to 7, and neither the slider nor the URL
+// parser was edited to follow. Whether a slider is drawn at all is
 // `variant.islands !== undefined`, never a comparison against an id.
 export type IslandRange = { min: number; max: number; default: number };
 
 export type Variant = {
     id: VariantId;
     // The one name a reader ever sees: the home page card, the `<h1>` and the
-    // document title. "Base Game", "Base Game Extension", "Seafarers".
+    // document title. "Base Game", "Base Game Extension", "Seafarers",
+    // "Seafarers Extension".
     name: string;
     // Which route segment this variant lives under. The back-reference is what
     // lets anything holding a variant build its own address without first
@@ -66,8 +70,8 @@ export type Variant = {
 };
 
 // A list rather than a `Record<PlayerCount, Variant>`, because a game need not
-// offer both: Seafarers has no 5-6 player entry until Phase 10, and a list
-// makes "this game offers one player count" representable instead of a hole.
+// offer both. Both do as of Phase 10, but the list is what let Seafarers ship
+// with one entry for two phases without a hole in a record.
 // It is also what the player control keys off — `variants.length > 1` decides
 // whether the control is drawn at all, in the same spirit as
 // `variant.islands !== undefined` deciding the slider. No control ever compares
@@ -109,6 +113,22 @@ export const VARIANTS: Readonly<Record<VariantId, Variant>> = {
         // cannot offer a setting the generator has not been proven to hit.
         islands: { min: 1, max: 6, default: 3 },
     },
+    "seafarers-56": {
+        id: "seafarers-56",
+        name: "Seafarers Extension",
+        game: "seafarers",
+        players: 6,
+        shape: SEAFARERS_56_SHAPE,
+        settings: SEAFARERS_56_SETTINGS,
+        // One higher than the 3-4 board, and the ceiling is a property of the
+        // frame rather than of the game: this one is ten hexes larger and nearly
+        // all of them ocean, so seeds have room to spread and single-attempt
+        // growth at seven islands succeeds 92.8% of the time — against 5.1% on
+        // the 42-hex frame, which is why that board stays at 6. Seven was
+        // unreachable at any budget under ROADMAP §5's rejection sampling.
+        // GENERATION.md carries both measurements.
+        islands: { min: 1, max: 7, default: 3 },
+    },
 };
 
 export const ALL_VARIANTS: readonly Variant[] = Object.values(VARIANTS);
@@ -120,7 +140,7 @@ export const GAMES: Readonly<Record<GameId, Game>> = {
     },
     seafarers: {
         id: "seafarers",
-        variants: [VARIANTS.seafarers],
+        variants: [VARIANTS.seafarers, VARIANTS["seafarers-56"]],
     },
 };
 

@@ -1,6 +1,6 @@
 # catan-next
 
-A Catan board generator — Base Game, the 5–6 player extension, and Seafarers —
+A Catan board generator — Base Game and Seafarers, each for 3–4 or 5–6 players —
 built with Next.js, React and inline SVG. It is a port of the Angular 9 app
 archived at [`lukeludlow/catan`](https://github.com/lukeludlow/catan), rewritten
 around axial hex coordinates rather than transliterated.
