@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import BoardControls from "@/components/controls/BoardControls";
-import { ALL_VARIANTS, VARIANTS } from "@/domain/variants";
-import type { Variant } from "@/domain/variants";
-import { parseParams } from "@/routing/boardUrl";
+import { ALL_GAMES, GAMES, gameById } from "@/domain/variants";
+import type { Game } from "@/domain/variants";
+import { canonicalParams, parseParams } from "@/routing/boardUrl";
 import type { BoardParams, Query } from "@/routing/boardUrl";
 
 // The controls' entire contract is the URL they push (ROADMAP §6), so that is
@@ -25,20 +25,15 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push }),
 }));
 
-const SEAFARERS = VARIANTS.seafarers;
-const BASE_GAME = VARIANTS["base-game"];
+const SEAFARERS = GAMES.seafarers;
+const BASE_GAME = GAMES["base-game"];
 
-const CASES = ALL_VARIANTS.map(
-    (variant) => [variant.name, variant] as [string, Variant],
-);
+const CASES = ALL_GAMES.map((game) => [game.id, game] as [string, Game]);
 
-function paramsFor(variant: Variant): BoardParams {
-    return {
-        seed: "abc123",
-        ...(variant.islands === undefined
-            ? {}
-            : { islands: variant.islands.default }),
-    };
+// The params the route would hand down for a bare `?seed=abc123` visit — the
+// default board of that game, spelled out.
+function paramsFor(game: Game): BoardParams {
+    return canonicalParams({ seed: "abc123" }, game);
 }
 
 // Reads the pushed href back through the module the route parses it with, so
@@ -46,15 +41,13 @@ function paramsFor(variant: Variant): BoardParams {
 function pushed(call = 0): { path: string; params: Partial<BoardParams> } {
     const href = push.mock.calls[call][0] as string;
     const url = new URL(href, "http://board.test");
-    const variant =
-        ALL_VARIANTS.find((entry) => `/${entry.id}` === url.pathname) ??
-        SEAFARERS;
+    const game = gameById(url.pathname.slice(1)) ?? SEAFARERS;
 
     return {
         path: url.pathname,
         params: parseParams(
             Object.fromEntries(url.searchParams) as Query,
-            variant,
+            game,
         ),
     };
 }
@@ -78,9 +71,9 @@ describe("BoardControls", () => {
         push.mockClear();
     });
 
-    test.each(CASES)("gives the %s a regenerate button", async (_, variant) => {
+    test.each(CASES)("gives %s a regenerate button", async (_, game) => {
         const screen = await render(
-            <BoardControls variant={variant} params={paramsFor(variant)} />,
+            <BoardControls game={game} params={paramsFor(game)} />,
         );
 
         await expect
@@ -88,22 +81,40 @@ describe("BoardControls", () => {
             .toBeInTheDocument();
     });
 
+    // Drawn from the registry, never from an id: a game offering one board has
+    // nothing to toggle between, so it gets no toggle. Phase 10 giving
+    // Seafarers a 5-6 player entry flips this case without an edit here.
+    test.each(CASES)(
+        "draws %s a toggle only if it has one",
+        async (_, game) => {
+            const screen = await render(
+                <BoardControls game={game} params={paramsFor(game)} />,
+            );
+            const toggles = screen.getByRole("radiogroup", { name: "players" });
+
+            expect(await toggles.elements()).toHaveLength(
+                game.variants.length > 1 ? 1 : 0,
+            );
+        },
+    );
+
     test("offers the islands slider the registry's bounds", async () => {
+        const range = SEAFARERS.variants[0].islands;
         const { container } = await render(
-            <BoardControls variant={SEAFARERS} params={paramsFor(SEAFARERS)} />,
+            <BoardControls game={SEAFARERS} params={paramsFor(SEAFARERS)} />,
         );
         const slider = container.querySelector<HTMLInputElement>("#islands");
 
-        expect(slider?.min).toBe(String(SEAFARERS.islands?.min));
-        expect(slider?.max).toBe(String(SEAFARERS.islands?.max));
-        expect(slider?.value).toBe(String(SEAFARERS.islands?.default));
+        expect(slider?.min).toBe(String(range?.min));
+        expect(slider?.max).toBe(String(range?.max));
+        expect(slider?.value).toBe(String(range?.default));
     });
 
     // A board with no sea is always one landmass, so a slider would be a
     // control with nothing to control.
     test("draws no slider for a variant with no islands range", async () => {
         const { container } = await render(
-            <BoardControls variant={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
         );
 
         expect(container.querySelector("#islands")).toBeNull();
@@ -113,7 +124,7 @@ describe("BoardControls", () => {
     test("pushes the new island count when the slider is moved", async () => {
         const params = paramsFor(SEAFARERS);
         const { container } = await render(
-            <BoardControls variant={SEAFARERS} params={params} />,
+            <BoardControls game={SEAFARERS} params={params} />,
         );
 
         await pressArrowRight(container);
@@ -127,7 +138,7 @@ describe("BoardControls", () => {
     // two island counts, and the URL stays reproducible either way.
     test("keeps the seed when the slider is moved", async () => {
         const { container } = await render(
-            <BoardControls variant={SEAFARERS} params={paramsFor(SEAFARERS)} />,
+            <BoardControls game={SEAFARERS} params={paramsFor(SEAFARERS)} />,
         );
 
         await pressArrowRight(container);
@@ -140,7 +151,7 @@ describe("BoardControls", () => {
     // that goes back to the board already on screen.
     test("pushes one address per gesture, not one per handler", async () => {
         const { container } = await render(
-            <BoardControls variant={SEAFARERS} params={paramsFor(SEAFARERS)} />,
+            <BoardControls game={SEAFARERS} params={paramsFor(SEAFARERS)} />,
         );
 
         await pressArrowRight(container);
@@ -155,14 +166,11 @@ describe("BoardControls", () => {
     test("pushes the same address again after a navigation lands", async () => {
         const params = paramsFor(SEAFARERS);
         const { container, rerender } = await render(
-            <BoardControls variant={SEAFARERS} params={params} />,
+            <BoardControls game={SEAFARERS} params={params} />,
         );
 
         const at = (islands: number) => (
-            <BoardControls
-                variant={SEAFARERS}
-                params={{ ...params, islands }}
-            />
+            <BoardControls game={SEAFARERS} params={{ ...params, islands }} />
         );
         const start = params.islands ?? 0;
 
@@ -179,7 +187,7 @@ describe("BoardControls", () => {
 
     test("pushes a fresh seed when regenerate is clicked", async () => {
         const screen = await render(
-            <BoardControls variant={SEAFARERS} params={paramsFor(SEAFARERS)} />,
+            <BoardControls game={SEAFARERS} params={paramsFor(SEAFARERS)} />,
         );
 
         await screen.getByRole("button", { name: "regenerate" }).click();
@@ -192,7 +200,7 @@ describe("BoardControls", () => {
     test("keeps the island count when regenerate is clicked", async () => {
         const params = paramsFor(SEAFARERS);
         const screen = await render(
-            <BoardControls variant={SEAFARERS} params={params} />,
+            <BoardControls game={SEAFARERS} params={params} />,
         );
 
         await screen.getByRole("button", { name: "regenerate" }).click();
@@ -202,7 +210,7 @@ describe("BoardControls", () => {
 
     test("regenerates somewhere new every time", async () => {
         const screen = await render(
-            <BoardControls variant={SEAFARERS} params={paramsFor(SEAFARERS)} />,
+            <BoardControls game={SEAFARERS} params={paramsFor(SEAFARERS)} />,
         );
         const button = screen.getByRole("button", { name: "regenerate" });
 
@@ -214,7 +222,7 @@ describe("BoardControls", () => {
 
     test("addresses the base game without an islands key", async () => {
         const screen = await render(
-            <BoardControls variant={BASE_GAME} params={paramsFor(BASE_GAME)} />,
+            <BoardControls game={BASE_GAME} params={paramsFor(BASE_GAME)} />,
         );
 
         await screen.getByRole("button", { name: "regenerate" }).click();
@@ -222,4 +230,19 @@ describe("BoardControls", () => {
         expect(pushed().path).toBe("/base-game");
         expect(pushed().params.islands).toBeUndefined();
     });
+
+    // Every address a control pushes carries the player count, so the link in
+    // the address bar is the whole board request.
+    test.each(CASES)(
+        "states the player count in %s's href",
+        async (_, game) => {
+            const screen = await render(
+                <BoardControls game={game} params={paramsFor(game)} />,
+            );
+
+            await screen.getByRole("button", { name: "regenerate" }).click();
+
+            expect(pushed().params.players).toBe(game.variants[0].players);
+        },
+    );
 });
